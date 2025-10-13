@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "︋",
+  "version": "1.0.0",
+  "description": "Speedy AI-powered Chrome sidepanel extension for intelligent browsing assistance",
+  
+  "permissions": [
+    "sidePanel",
+    "tabs",
+    "storage",
+    "contextMenus",
+    "history",
+    "activeTab",
+    "scripting",
+    "alarms",
+    "identity",
+    "identity.email"
+  ],
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "<all_urls>"
+  ],
+  "side_panel": {
+    "default_path": "dist/sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open Speedy Sidepanel"
+  },
+  "commands": {
+    "toggle-sidepanel": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+D",
+        "mac": "Command+Shift+D"
+      },
+      "description": "Toggle Speedy sidepanel"
+    },
+    "toggle-launcher": {
+      "suggested_key": {
+        "default": "Ctrl+K",
+        "mac": "Command+K"
+      },
+      "description": "Open Speedy launcher"
+    },
+    "toggle-custom-sidebar": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "Toggle custom sidebar"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "svg/*.svg",
+        "svg/nav/*.svg",
+        "assets/*.css",
+        "chunks/*.js",
+        "*.css",
+        "*.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:* https://*;"
+  }
+}
+
+
+
+
+
