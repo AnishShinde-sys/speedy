@@ -6,20 +6,20 @@ A Chrome extension with AI-powered chat capabilities.
 
 ```
 speedy/
-├── api/              # Backend API server
-│   ├── src/          # TypeScript source files
-│   └── package.json  # API dependencies
-├── src/              # Chrome extension source
-│   ├── components/   # React components
-│   └── Sidepanel.jsx # Main sidepanel UI
-├── manifest.json     # Chrome extension manifest
-└── package.json      # Extension dependencies
+├── extension/        # Chrome extension
+│   ├── src/          # React source files
+│   ├── manifest.json # Chrome extension manifest
+│   └── package.json  # Extension dependencies
+└── api/              # Backend API server
+    ├── src/          # TypeScript source files
+    └── package.json  # API dependencies
 ```
 
 ## Development
 
 ### Extension
 ```bash
+cd extension
 npm install
 npm run dev
 ```
@@ -35,6 +35,7 @@ npm run dev
 
 ### Extension
 ```bash
+cd extension
 npm run build
 ```
 
@@ -43,4 +44,3 @@ npm run build
 cd api
 npm run build
 ```
-

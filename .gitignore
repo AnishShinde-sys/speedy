@@ -1,10 +1,12 @@
 # Dependencies
 node_modules/
+extension/node_modules/
 api/node_modules/
 
 # Build outputs
 dist/
 build/
+extension/dist/
 api/dist/
 
 # Environment variables
@@ -13,6 +15,7 @@ api/dist/
 .env.development.local
 .env.test.local
 .env.production.local
+extension/.env
 api/.env
 
 # Logs
@@ -36,6 +39,4 @@ Thumbs.db
 # Misc
 .cache/
 *.tsbuildinfo
-
-# Git
-.git/
+.vite/
