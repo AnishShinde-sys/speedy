@@ -6,6 +6,8 @@
   function createOverlay() {
     const overlayHTML = `
       <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
         * {
           box-sizing: border-box;
         }
@@ -104,7 +106,7 @@
           border-radius: 12px;
           font-size: 13px;
           line-height: 19px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+          font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
           white-space: pre-wrap;
           word-break: break-word;
@@ -205,23 +207,25 @@
           <!-- Context Pills Row -->
           <div style="
             align-items: center;
-            display: flex;
-            gap: 4px;
+              display: flex;
+              gap: 4px;
             width: 100%;
             flex-wrap: wrap;
             margin-bottom: 4px;
           ">
             <!-- @ Button (Fixed Position) -->
             <div tabindex="0" id="speedy-at-button" style="
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              padding: 2px;
-              height: 20px;
-              width: 20px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              padding: 0 6px;
+              height: 26px;
+              min-height: 26px;
+              max-height: 26px;
+              width: auto;
               box-sizing: border-box;
-              border-radius: 4px;
+              border-radius: 6px;
               border: 1px solid rgba(228, 228, 228, 0.11);
               outline: none;
               flex-shrink: 0;
@@ -230,11 +234,11 @@
               transition-duration: 0s;
               transition-timing-function: ease;
               user-select: none;
-              font-family: -apple-system, system-ui, sans-serif;
+              font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
               font-size: 13px;
               color: rgba(228, 228, 228, 0.55);
             ">
-              <span style="font-size: 11px; color: rgba(228, 228, 228, 0.55); padding-left: 0px;">@</span>
+              <span style="font-size: 13px; color: rgba(228, 228, 228, 0.55); line-height: 26px;">@</span>
             </div>
             
             <!-- Context Pills Container -->
@@ -244,12 +248,12 @@
           </div>
           
           <!-- Tab Selection Menu -->
-          <div id="speedy-tab-menu" style="
-            display: none;
-            position: absolute;
+            <div id="speedy-tab-menu" style="
+              display: none;
+              position: absolute;
             bottom: calc(100% + 8px);
-            left: 0;
-            right: 0;
+              left: 0;
+              right: 0;
             z-index: 1001;
             flex-shrink: 0;
             padding: 0 12px 12px;
@@ -260,17 +264,15 @@
               transition: box-shadow 150ms ease-out;
               border-radius: 17px;
               padding: 5px;
-              background: radial-gradient(144.11% 100% at 50% 0%, rgba(250, 250, 250, 0.8) 0%, rgba(240, 240, 240, 0.6) 100%);
-              box-shadow: rgba(255, 255, 255, 0.95) 0px 1.5px 0px 0px inset, rgba(0, 0, 0, 0.09) 0px 1px 3px 0px;
-              backdrop-filter: blur(20px);
-              -webkit-backdrop-filter: blur(20px);
+              background: #ffffff;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
               height: auto;
             ">
               <div style="width: 100%;">
                 <div>
                   <div style="
                     max-height: 276px;
-                    overflow-y: auto;
+              overflow-y: auto;
                     opacity: 1;
                     height: auto;
                   " class="no-scrollbar">
@@ -306,7 +308,7 @@
                      resize: none;
                      overflow: hidden;
                      line-height: 1.5;
-                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                     font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                      font-size: 13px;
                      color: rgba(255, 255, 255, 0.9);
                      background-color: transparent;
@@ -324,13 +326,13 @@
                      overflow-y: auto;
                    "
               ></div>
+              </div>
             </div>
-          </div>
-          
+            
           <!-- Bottom Bar: Model + Actions -->
-          <div style="
-            display: flex;
-            align-items: center;
+            <div style="
+              display: flex;
+              align-items: center;
             justify-content: space-between;
             gap: 4px;
             flex-shrink: 0;
@@ -342,8 +344,8 @@
             <!-- Left: Model Picker -->
             <div style="
               display: flex;
-              align-items: center;
-              gap: 4px;
+                  align-items: center;
+                  gap: 4px;
               margin-right: 6px;
               flex-shrink: 1;
               flex-grow: 0;
@@ -383,7 +385,7 @@
                       min-width: 0px;
                       text-overflow: ellipsis;
                       vertical-align: middle;
-                      white-space: nowrap;
+                  white-space: nowrap;
                       line-height: 12px;
                       display: flex;
                       align-items: center;
@@ -442,33 +444,57 @@
                   z-index: 1000;
                   min-width: 280px;
                 ">
-                  <div style="position: sticky; top: 0; background: #fff; padding: 4px 0px 8px; z-index: 1;">
-                    <input id="speedy-model-search" placeholder="Search models…" style="
-                      width: 100%;
-                      box-sizing: border-box;
-                      padding: 8px 10px;
-                      font-size: 13px;
-                      border-radius: 8px;
-                      border: 1px solid rgba(0,0,0,0.12);
-                      outline: none;
-                    "/>
+                  <div style="padding: 8px 8px 4px; font-size: 11px; color: rgba(0,0,0,0.6); font-weight: 600; letter-spacing: 0.3px; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                    BASIC
                   </div>
-                  <div style="padding: 8px 8px 4px; font-size: 11px; color: rgba(0,0,0,0.6); font-weight: 600; letter-spacing: 0.3px;">
-                    POPULAR MODELS
+                  <div id="speedy-basic-models"></div>
+                  
+                  <div style="padding: 8px 8px 4px; font-size: 11px; color: rgba(0,0,0,0.6); font-weight: 600; letter-spacing: 0.3px; margin-top: 4px; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                    ADVANCED
                   </div>
-                  <div id="speedy-popular-models"></div>
+                  <div id="speedy-advanced-models"></div>
+                  
+                  <div style="height: 1px; background: rgba(0,0,0,0.1); margin: 8px 4px;"></div>
+                  
+                  <div id="speedy-other-models-btn" style="
+                    padding: 5px 8px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    border-radius: 8px;
+                    transition: background 0.1s;
+                  ">
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(0,0,0,0.85); font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                      <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
+                        <path fill="currentColor" d="M4 8a1.333 1.333 0 1 1-2.667 0A1.333 1.333 0 0 1 4 8m5.333 0a1.333 1.333 0 1 1-2.666 0 1.333 1.333 0 0 1 2.666 0m4 1.333a1.333 1.333 0 1 0 0-2.666 1.333 1.333 0 0 0 0 2.666"/>
+                      </svg>
+                      Other models
+                    </div>
+                    <svg width="12" height="12" fill="none" viewBox="0 0 12 12">
+                      <path fill="currentColor" fill-rule="evenodd" d="M4.176 10.225a.6.6 0 0 0 .848 0l3.517-3.518a1 1 0 0 0 0-1.414L5.024 1.776a.6.6 0 1 0-.848.849L7.55 6 4.176 9.376a.6.6 0 0 0 0 .849" clip-rule="evenodd"/>
+                    </svg>
+                  </div>
                   
                   <div id="speedy-all-models-section" style="display: none;">
-                    <div style="border-top: 1px solid rgba(0,0,0,0.1); margin: 8px 0;"></div>
-                    <div style="padding: 8px 8px 4px; font-size: 11px; color: rgba(0,0,0,0.6); font-weight: 600; letter-spacing: 0.3px;">
-                      ALL MODELS
+                    <div style="position: sticky; top: 0; background: #fff; padding: 8px 0px; z-index: 1;">
+                      <input id="speedy-model-search" placeholder="Search all models…" style="
+                        width: 100%;
+                        box-sizing: border-box;
+                        padding: 8px 10px;
+                        font-size: 13px;
+                        font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                        border-radius: 8px;
+                        border: 1px solid rgba(0,0,0,0.12);
+                        outline: none;
+                      "/>
                     </div>
                     <div id="speedy-all-models"></div>
                   </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            
+              
             <!-- Right: Action Buttons -->
             <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-end;">
               <!-- Image Upload Button -->
@@ -482,13 +508,33 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                padding: 0;
+                  padding: 0;
                 transition: opacity 0.1s;
               " title="Upload image">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                   <circle cx="8.5" cy="8.5" r="1.5"/>
                   <polyline points="21 15 16 10 5 21"/>
+                </svg>
+              </button>
+              
+              <!-- Screenshot Capture Button -->
+              <button type="button" id="speedy-screenshot-capture" style="
+                width: 18px;
+                height: 18px;
+                  background: transparent;
+                  border: none;
+                color: rgba(255, 255, 255, 0.9);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+                transition: opacity 0.1s;
+              " title="Capture screen">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
                 </svg>
               </button>
               
@@ -517,7 +563,7 @@
                 </svg>
               </button>
             </div>
-          </div>
+            </div>
         </form>
       </div>
     `;
@@ -553,12 +599,15 @@
     const modelName = shadowRoot.getElementById('speedy-model-name');
     const modelChevron = shadowRoot.getElementById('speedy-model-chevron');
     const modelSearch = shadowRoot.getElementById('speedy-model-search');
-    const popularModelsContainer = shadowRoot.getElementById('speedy-popular-models');
+    const basicModelsContainer = shadowRoot.getElementById('speedy-basic-models');
+    const advancedModelsContainer = shadowRoot.getElementById('speedy-advanced-models');
+    const otherModelsBtn = shadowRoot.getElementById('speedy-other-models-btn');
     const allModelsContainer = shadowRoot.getElementById('speedy-all-models');
     const allModelsSection = shadowRoot.getElementById('speedy-all-models-section');
     const messagesContainer = shadowRoot.getElementById('speedy-messages-container');
     const messagesList = shadowRoot.getElementById('speedy-messages-list');
     const imageUploadBtn = shadowRoot.getElementById('speedy-image-upload');
+    const screenshotBtn = shadowRoot.getElementById('speedy-screenshot-capture');
     
     // State
     let message = '';
@@ -571,13 +620,19 @@
     let currentChatId = null;
     let messages = [];
     let isStreaming = false;
+    let capturedScreenshots = [];
     
-    // Popular models to show first
-    const popularModels = [
-      'anthropic/claude-3.5-sonnet',
+    // Basic models (fast, everyday use)
+    const basicModels = [
       'anthropic/claude-3-haiku',
-      'openai/gpt-4-turbo',
       'openai/gpt-3.5-turbo',
+      'google/gemini-flash'
+    ];
+    
+    // Advanced models (powerful, complex tasks)
+    const advancedModels = [
+      'anthropic/claude-3.5-sonnet',
+      'openai/gpt-4-turbo',
       'google/gemini-pro'
     ];
     
@@ -664,48 +719,56 @@
     
     // Render models in dropdown
     function renderModels(searchQuery = '') {
-      popularModelsContainer.innerHTML = '';
+      // If searching, show all models section
+      if (searchQuery) {
+        allModelsSection.style.display = 'block';
+        otherModelsBtn.style.display = 'none';
+        basicModelsContainer.parentElement.style.display = 'none';
+        advancedModelsContainer.parentElement.style.display = 'none';
+        
       allModelsContainer.innerHTML = '';
+        const query = searchQuery.toLowerCase();
+        
+        const filteredModels = availableModels.filter(m => {
+          const name = m.name || m.id;
+          return name.toLowerCase().includes(query) || m.id.toLowerCase().includes(query);
+        }).slice(0, 30);
+        
+        filteredModels.forEach(model => {
+          const modelButton = createModelButton(model);
+          allModelsContainer.appendChild(modelButton);
+        });
+        return;
+      }
       
-      const query = searchQuery.toLowerCase();
+      // Default view: show basic/advanced sections
+      allModelsSection.style.display = 'none';
+      otherModelsBtn.style.display = 'flex';
+      basicModelsContainer.parentElement.style.display = 'block';
+      advancedModelsContainer.parentElement.style.display = 'block';
       
-      // Filter popular models
-      const filteredPopular = popularModels.filter(modelId => {
-        if (!query) return true;
-        const model = availableModels.find(m => m.id === modelId);
-        const name = model?.name || modelId;
-        return name.toLowerCase().includes(query) || modelId.toLowerCase().includes(query);
-      });
+      basicModelsContainer.innerHTML = '';
+      advancedModelsContainer.innerHTML = '';
       
-      // Render popular models
-      filteredPopular.forEach(modelId => {
+      // Render basic models
+      basicModels.forEach(modelId => {
         const model = availableModels.find(m => m.id === modelId) || { 
           id: modelId, 
           name: modelId.split('/').pop() 
         };
         const modelButton = createModelButton(model);
-        popularModelsContainer.appendChild(modelButton);
+        basicModelsContainer.appendChild(modelButton);
       });
       
-      // Filter other models
-      const otherModels = availableModels
-        .filter(m => !popularModels.includes(m.id))
-        .filter(m => {
-          if (!query) return true;
-          const name = m.name || m.id;
-          return name.toLowerCase().includes(query) || m.id.toLowerCase().includes(query);
-        })
-        .slice(0, 20);
-      
-      if (otherModels.length > 0) {
-        allModelsSection.style.display = 'block';
-        otherModels.forEach(model => {
+      // Render advanced models
+      advancedModels.forEach(modelId => {
+        const model = availableModels.find(m => m.id === modelId) || { 
+          id: modelId, 
+          name: modelId.split('/').pop() 
+        };
           const modelButton = createModelButton(model);
-          allModelsContainer.appendChild(modelButton);
+        advancedModelsContainer.appendChild(modelButton);
         });
-      } else {
-        allModelsSection.style.display = 'none';
-      }
     }
     
     // Create model button
@@ -719,6 +782,7 @@
         text-align: left;
         padding: 8px 10px;
         font-size: 13px;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         border-radius: 8px;
         border: none;
         background: ${isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent'};
@@ -992,12 +1056,21 @@
     }
     
     async function loadAvailableTabs() {
+      console.log('🔍 [Overlay] Requesting tabs from content script...');
       window.postMessage({
         type: 'SPEEDY_REQUEST_TABS'
       }, '*');
     }
     
     function addContextChip(tab) {
+      console.log('🔍 [Overlay] addContextChip called with tab:', {
+        id: tab.id,
+        title: tab.title,
+        url: tab.url,
+        hasFavIcon: !!tab.favIconUrl,
+        favIconUrl: tab.favIconUrl
+      });
+      
       if (selectedTabs.find(t => t.id === tab.id)) return;
       
       selectedTabs.push(tab);
@@ -1042,51 +1115,60 @@
         display: flex;
         align-items: center;
         gap: 4px;
-        padding: 2px 4px;
-        border-radius: 4px;
+        padding: 0 8px;
+        border-radius: 6px;
         background: transparent;
-        font-family: -apple-system, system-ui, sans-serif;
-        font-size: 12px;
-        line-height: 16px;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 13px;
+        line-height: 26px;
         color: rgba(228, 228, 228, 0.55);
         user-select: none;
         text-overflow: ellipsis;
         white-space: nowrap;
         overflow: visible;
         box-sizing: border-box;
-        height: 20px;
+        height: 26px;
+        min-height: 26px;
+        max-height: 26px;
       `;
       
-      const title = tab.title.length > 30 ? tab.title.substring(0, 30) + '...' : tab.title;
-      const favicon = tab.favIconUrl;
+      // Truncate title to 10-12 characters max
+      const maxLength = 11;
+      const titleText = tab.title.length > maxLength ? tab.title.substring(0, maxLength) : tab.title;
+      const hasEllipsis = tab.title.length > maxLength;
       
-      chip.innerHTML = `
-        ${favicon ? `
-          <div style="width: 16px; margin-left: -3px; margin-right: -3px; display: flex; align-items: center; justify-content: center; scale: 0.8;">
-            <img src="${favicon}" onerror="this.style.display='none';" style="width: 16px; height: 16px; border-radius: 2px;" />
-          </div>
-        ` : ''}
-        <div style="flex-shrink: 0; opacity: 1; color: rgba(255, 255, 255, 0.9); font-size: 12px;">${title}</div>
-        <button class="remove-chip" style="
-          margin-left: 2px;
-          padding: 0;
-          background: none;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+      // Favicon already converted to data URL by background script
+      const favicon = tab.favIconUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="%23666"/></svg>';
+      console.log(`✅ [Overlay] Context chip favicon for tab ${tab.id}:`, favicon.substring(0, 50) + '...');
+       
+       chip.innerHTML = `
+        <div style="width: 16px; margin-left: -4px; margin-right: -2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <img src="${favicon}" style="width: 13px; height: 13px; border-radius: 2px; object-fit: contain;" />
+        </div>
+        <div style="flex-shrink: 0; opacity: 1; color: rgba(255, 255, 255, 0.9); font-size: 13px; line-height: 26px; display: flex; align-items: baseline;">
+          <span>${titleText}</span>${hasEllipsis ? '<span style="font-weight: 200; opacity: 0.7;">...</span>' : ''}
+        </div>
+         <button class="remove-chip" style="
+          margin-left: 4px;
+           padding: 0;
+           background: none;
+           border: none;
+           cursor: pointer;
+           display: flex;
+           align-items: center;
+           justify-content: center;
           opacity: 0.5;
           transition: opacity 0.1s;
-          width: 12px;
-          height: 12px;
+          width: 14px;
+          height: 14px;
+          flex-shrink: 0;
           color: rgba(255, 255, 255, 0.9);
         ">
           <svg width="10" height="10" viewBox="0 0 512 512" fill="currentColor" style="display: block;">
-            <path d="m289.94 256 95-95A24 24 0 0 0 351 127l-95 95-95-95a24 24 0 0 0-34 34l95 95-95 95a24 24 0 1 0 34 34l95-95 95 95a24 24 0 0 0 34-34z"/>
-          </svg>
-        </button>
-      `;
+             <path d="m289.94 256 95-95A24 24 0 0 0 351 127l-95 95-95-95a24 24 0 0 0-34 34l95 95-95 95a24 24 0 1 0 34 34l95-95 95 95a24 24 0 0 0 34-34z"/>
+           </svg>
+         </button>
+       `;
       
       chip.addEventListener('mouseenter', () => {
         chip.style.background = 'rgba(255, 255, 255, 0.2)';
@@ -1122,18 +1204,185 @@
       }, '*');
     }
     
+    // Add screenshot chip to context pills
+    function addScreenshotChip(screenshot) {
+      // Create wrapper div
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = `
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      `;
+      
+      // Create pill container
+      const pillContainer = document.createElement('div');
+      pillContainer.tabIndex = 0;
+      pillContainer.dataset.screenshotId = screenshot.id;
+      pillContainer.style.cssText = `
+        display: inline-flex;
+        max-width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        flex-shrink: 0;
+        position: relative;
+        outline: none;
+        visibility: visible;
+      `;
+      
+      // Create the actual pill
+      const chip = document.createElement('div');
+      chip.className = 'screenshot-chip';
+      chip.style.cssText = `
+        transition-property: opacity;
+        transition-duration: 0.2s;
+        transition-timing-function: ease;
+        position: relative;
+           cursor: pointer;
+        border-style: dashed;
+        border-width: 1px;
+        border-color: rgba(228, 228, 228, 0.124);
+        opacity: 1;
+           display: flex;
+           align-items: center;
+        gap: 4px;
+        padding: 0 8px;
+        border-radius: 6px;
+        background: transparent;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 13px;
+        line-height: 26px;
+        color: rgba(228, 228, 228, 0.55);
+        user-select: none;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: visible;
+        box-sizing: border-box;
+        height: 26px;
+        min-height: 26px;
+        max-height: 26px;
+      `;
+      
+      chip.innerHTML = `
+        <div style="width: 16px; margin-left: -4px; margin-right: -2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <img src="${screenshot.thumbnail}" style="width: 13px; height: 13px; border-radius: 2px; object-fit: cover;" />
+        </div>
+        <div style="flex-shrink: 0; opacity: 1; color: rgba(255, 255, 255, 0.9); font-size: 13px; line-height: 26px;">Screenshot</div>
+        <button class="remove-chip" style="
+          margin-left: 4px;
+          padding: 0;
+          background: none;
+          border: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0.5;
+          transition: opacity 0.1s;
+          width: 14px;
+          height: 14px;
+          flex-shrink: 0;
+          color: rgba(255, 255, 255, 0.9);
+        ">
+          <svg width="10" height="10" viewBox="0 0 512 512" fill="currentColor" style="display: block;">
+            <path d="m289.94 256 95-95A24 24 0 0 0 351 127l-95 95-95-95a24 24 0 0 0-34 34l95 95-95 95a24 24 0 1 0 34 34l95-95 95 95a24 24 0 0 0 34-34z"/>
+          </svg>
+        </button>
+      `;
+      
+      // Hover effects
+      chip.addEventListener('mouseenter', () => {
+        chip.style.background = 'rgba(255, 255, 255, 0.2)';
+        chip.style.opacity = '1';
+        const removeBtn = chip.querySelector('.remove-chip');
+        if (removeBtn) removeBtn.style.opacity = '1';
+      });
+      
+      chip.addEventListener('mouseleave', () => {
+        chip.style.background = 'transparent';
+        chip.style.opacity = '1';
+        const removeBtn = chip.querySelector('.remove-chip');
+        if (removeBtn) removeBtn.style.opacity = '0.5';
+      });
+      
+      // Click to preview screenshot
+      chip.addEventListener('click', (e) => {
+        if (!e.target.closest('.remove-chip')) {
+          showScreenshotPreview(screenshot);
+        }
+      });
+      
+      // Remove chip handler
+      chip.querySelector('.remove-chip').addEventListener('click', (e) => {
+        e.stopPropagation();
+        capturedScreenshots = capturedScreenshots.filter(s => s.id !== screenshot.id);
+        wrapper.remove();
+      });
+      
+      pillContainer.appendChild(chip);
+      wrapper.appendChild(pillContainer);
+      contextPills.appendChild(wrapper);
+    }
+    
+    // Show screenshot preview overlay
+    function showScreenshotPreview(screenshot) {
+      // Create overlay
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 1000000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        cursor: pointer;
+      `;
+      
+      // Create image
+      const img = document.createElement('img');
+      img.src = screenshot.dataUrl;
+      img.style.cssText = `
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 8px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      `;
+      
+      // Close on click
+      overlay.addEventListener('click', () => {
+        overlay.remove();
+      });
+      
+      overlay.appendChild(img);
+      shadowRoot.appendChild(overlay);
+    }
+    
     function renderTabList(tabs) {
+      console.log('🔍 [Overlay] renderTabList called with tabs:', tabs);
       availableTabs = tabs;
       tabList.innerHTML = '';
       
-      tabs.forEach(tab => {
+      tabs.forEach((tab, index) => {
+        console.log(`🔍 [Overlay] Processing tab ${index}:`, {
+          id: tab.id,
+          title: tab.title,
+          url: tab.url,
+          hasFavIcon: !!tab.favIconUrl,
+          favIconUrl: tab.favIconUrl
+        });
+        
         const isSelected = selectedTabs.find(t => t.id === tab.id);
         
         // Create wrapper div
         const wrapper = document.createElement('div');
         wrapper.style.cssText = `
           position: relative;
-          cursor: pointer;
+           cursor: pointer;
           display: block;
           width: 100%;
           border-radius: 10px;
@@ -1149,12 +1398,12 @@
           width: 100%;
           text-align: left;
           padding: 6px 8px;
-          font-size: 13px;
-          display: flex;
-          align-items: center;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+             font-size: 13px; 
+           display: flex;
+           align-items: center;
+             overflow: hidden; 
+             text-overflow: ellipsis; 
+             white-space: nowrap;
           transition: colors 150ms;
           border-radius: 15px;
           border: none;
@@ -1162,40 +1411,33 @@
           cursor: pointer;
         `;
         
-        const title = tab.title || 'Untitled';
+         const title = tab.title || 'Untitled';
         const displayTitle = title.length > 25 ? title.substring(0, 25) + '...' : title;
         const url = tab.url || '';
         const displayUrl = url.length > 40 ? url.substring(0, 40) + '...' : url;
         
-        // Get favicon URL
-        let faviconUrl = tab.favIconUrl;
-        if (!faviconUrl && url) {
-          try {
-            const urlObj = new URL(url);
-            faviconUrl = `${urlObj.origin}/favicon.ico`;
-          } catch (e) {
-            faviconUrl = '';
-          }
-        }
+        // Favicon already converted to data URL by background script
+        const faviconUrl = tab.favIconUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="%23666"/></svg>';
+        console.log(`✅ [Overlay] Tab menu favicon for tab ${tab.id}:`, faviconUrl.substring(0, 50) + '...');
         
         button.innerHTML = `
           <span style="
             margin-right: 6px;
-            flex-shrink: 0;
+                  flex-shrink: 0;
             width: 13px;
             height: 13px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+             display: flex;
+             align-items: center;
+             justify-content: center;
           ">
-            ${faviconUrl ? `<img alt="${title}" width="13" height="13" src="${faviconUrl}" onerror="this.style.display='none';" style="object-fit: contain;" />` : ''}
+            <img alt="${title}" width="13" height="13" src="${faviconUrl}" style="object-fit: contain;" />
           </span>
-          <div style="
+           <div style="
             color: rgba(0, 0, 0, 0.85);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            flex-shrink: 0;
+             overflow: hidden; 
+             text-overflow: ellipsis; 
+             white-space: nowrap;
+             flex-shrink: 0;
           ">${displayTitle}</div>
           <div style="
             font-size: 13px;
@@ -1203,9 +1445,9 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            margin-left: 8px;
+             margin-left: 8px;
           ">${displayUrl}</div>
-        `;
+         `;
         
         // Hover effects
         wrapper.addEventListener('mouseenter', () => {
@@ -1251,6 +1493,38 @@
       } else {
         closeModelMenu();
       }
+    });
+    
+    // Other models button handler
+    otherModelsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      allModelsSection.style.display = 'block';
+      otherModelsBtn.style.display = 'none';
+      basicModelsContainer.parentElement.style.display = 'none';
+      advancedModelsContainer.parentElement.style.display = 'none';
+      
+      // Render all models
+      allModelsContainer.innerHTML = '';
+      const allOtherModels = availableModels
+        .filter(m => !basicModels.includes(m.id) && !advancedModels.includes(m.id))
+        .slice(0, 30);
+      
+      allOtherModels.forEach(model => {
+        const modelButton = createModelButton(model);
+        allModelsContainer.appendChild(modelButton);
+      });
+      
+      setTimeout(() => modelSearch.focus(), 50);
+    });
+    
+    otherModelsBtn.addEventListener('mouseenter', () => {
+      otherModelsBtn.style.background = 'rgba(0, 0, 0, 0.05)';
+    });
+    
+    otherModelsBtn.addEventListener('mouseleave', () => {
+      otherModelsBtn.style.background = 'transparent';
     });
     
     // Model search handler
@@ -1312,7 +1586,7 @@
       
       // Handle @ key to open tab menu
       if (e.key === '@') {
-        setTimeout(() => {
+      setTimeout(() => {
           tabMenu.style.display = 'block';
           atButton.style.background = 'rgba(255, 255, 255, 0.1)';
         }, 0);
@@ -1336,13 +1610,90 @@
       form.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)';
     });
     
+    // Screenshot capture handler
+    screenshotBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      try {
+        // Send message to background script to capture screenshot
+        chrome.runtime.sendMessage({
+          type: 'CAPTURE_SCREENSHOT'
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error('Screenshot capture error:', chrome.runtime.lastError);
+            showNotification('Screenshot capture failed');
+            return;
+          }
+          
+          if (response && response.dataUrl) {
+            // Add screenshot to captured list
+            const screenshot = {
+              id: `screenshot-${Date.now()}`,
+              dataUrl: response.dataUrl,
+              timestamp: new Date().toISOString(),
+              thumbnail: response.dataUrl // We'll use same for now
+            };
+            
+            capturedScreenshots.push(screenshot);
+            
+            // Add screenshot chip to context
+            addScreenshotChip(screenshot);
+            
+            // Show notification
+            showNotification('Screenshot captured!');
+          }
+        });
+      } catch (error) {
+        console.error('Screenshot failed:', error);
+        showNotification('Screenshot capture failed');
+      }
+    });
+    
+    // Show notification function
+    function showNotification(text, duration = 2000) {
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        z-index: 999998;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+      `;
+      notification.textContent = text;
+      
+      shadowRoot.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.opacity = '1';
+      }, 10);
+      
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+          notification.remove();
+        }, 200);
+      }, duration);
+    }
+    
     // Form submit handler
     form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+        e.preventDefault();
       
       if (!message.trim() || isStreaming) return;
       
       const messageToSend = message.trim();
+      
+      // Build context from tabs
       const contextsToSend = selectedTabs.map(tab => ({
         type: 'tab',
         data: {
@@ -1354,14 +1705,28 @@
         }
       }));
       
+      // Add screenshots to context
+      capturedScreenshots.forEach(screenshot => {
+        contextsToSend.push({
+          type: 'image',
+          data: {
+            id: screenshot.id,
+            dataUrl: screenshot.dataUrl,
+            timestamp: screenshot.timestamp
+          }
+        });
+      });
+      
       message = '';
       input.textContent = '';
       button.disabled = true;
-      button.style.color = 'rgba(255, 255, 255, 0.5)';
+            button.style.color = 'rgba(255, 255, 255, 0.5)';
       updatePlaceholder();
       
       selectedTabs = [];
+      capturedScreenshots = [];
       shadowRoot.querySelectorAll('.context-chip').forEach(chip => chip.remove());
+      shadowRoot.querySelectorAll('.screenshot-chip').forEach(chip => chip.remove());
       
       try {
         await sendMessageToAPI(messageToSend, contextsToSend);
@@ -1388,7 +1753,9 @@
       }
       
       if (event.data.type === 'SPEEDY_TABS_RESPONSE') {
+        console.log('✅ [Overlay] Received SPEEDY_TABS_RESPONSE:', event.data);
         const tabs = event.data.tabs || [];
+        console.log('📋 [Overlay] Tabs count:', tabs.length);
         renderTabList(tabs);
       }
     });

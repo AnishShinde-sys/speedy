@@ -1,1 +1,0 @@
-"use strict";const n=require("electron"),c={ipcRenderer:{send(e,...r){n.ipcRenderer.send(e,...r)},invoke(e,...r){return n.ipcRenderer.invoke(e,...r)},on(e,r){n.ipcRenderer.on(e,(t,...o)=>{r(null,...o)})}},process:{platform:process.platform,env:{NODE_ENV:process.env.NODE_ENV}}};try{n.contextBridge.exposeInMainWorld("electron",c)}catch(e){console.error(e)}

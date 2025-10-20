@@ -84,6 +84,10 @@ async function handleMessage(message, sender, sendResponse) {
         await handleGetSelectedText(sender.tab.id, sendResponse);
         break;
         
+      case 'CAPTURE_SCREENSHOT':
+        await handleCaptureScreenshot(sender.tab, sendResponse);
+        break;
+        
       default:
         console.warn('⚠️ [Background] Unknown message type:', message.type);
         sendResponse({ success: false, error: 'Unknown message type' });
@@ -118,16 +122,54 @@ async function handleGetCurrentTab(sendResponse) {
 }
 
 // Get all tabs
+// Helper function to convert favicon to data URL
+async function getFaviconAsDataUrl(faviconUrl) {
+  try {
+    const response = await fetch(faviconUrl);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('Failed to fetch favicon:', faviconUrl, error);
+    return null;
+  }
+}
+
 async function handleGetAllTabs(sendResponse) {
   try {
     const tabs = await chrome.tabs.query({});
     
-    const tabList = tabs.map(tab => ({
-      id: tab.id,
-      title: tab.title,
-      url: tab.url,
-      favIconUrl: tab.favIconUrl,
-      active: tab.active
+    // Convert favicons to data URLs to bypass CSP
+    const tabList = await Promise.all(tabs.map(async tab => {
+      let faviconDataUrl = null;
+      
+      if (tab.favIconUrl) {
+        // Try to convert to data URL
+        faviconDataUrl = await getFaviconAsDataUrl(tab.favIconUrl);
+      }
+      
+      // Fallback to Google's service
+      if (!faviconDataUrl && tab.url) {
+        try {
+          const urlObj = new URL(tab.url);
+          const googleFaviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
+          faviconDataUrl = await getFaviconAsDataUrl(googleFaviconUrl);
+        } catch (e) {
+          console.error('Failed to get Google favicon for:', tab.url);
+        }
+      }
+      
+      return {
+        id: tab.id,
+        title: tab.title,
+        url: tab.url,
+        favIconUrl: faviconDataUrl || tab.favIconUrl, // Use data URL or original
+        active: tab.active
+      };
     }));
     
     sendResponse({ success: true, tabs: tabList });
@@ -164,6 +206,27 @@ async function handleGetSelectedText(tabId, sendResponse) {
       sendResponse({ success: false, error: 'No text selected' });
     }
   } catch (error) {
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Capture screenshot of visible tab
+async function handleCaptureScreenshot(tab, sendResponse) {
+  try {
+    if (!tab || !tab.id) {
+      sendResponse({ success: false, error: 'No active tab' });
+      return;
+    }
+    
+    // Capture the visible tab
+    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+      format: 'png',
+      quality: 100
+    });
+    
+    sendResponse({ success: true, dataUrl });
+  } catch (error) {
+    console.error('[Background] Screenshot capture failed:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
