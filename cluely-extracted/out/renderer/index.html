@@ -1,0 +1,24 @@
+<!doctype html>
+<html class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Electron</title>
+    <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+    <!-- note: "data:" is needed because Vite may inline small assets as data URLs -->
+    <!-- note: "blob:" is needed to make markdown rendering work -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' data: https://ph.cluely.com https://us-assets.i.posthog.com ; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://app.cluely.com https://workoscdn.com https://img.cluely.com; media-src 'self' blob:; frame-src https://app.cluely.com https://desktop.cluely.com https://desktop.cluely.com; font-src 'self' data:; connect-src 'self' https://platform.cluely.com https://desktop.cluely.com wss://service.transcribe.cluely.com https://service.transcribe.cluely.com https://ph.cluely.com https://us-assets.i.posthog.com https://sockjs-us3.pusher.com wss://api.openai.com wss://api.deepgram.com wss://streaming.assemblyai.com wss://ws-us3.pusher.com wss://api.gladia.io "
+    />
+    <script src=""></script>
+    <script type="module" crossorigin src="./assets/main-BzAPKaqF.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/globals-DXbuEYWf.js">
+    <link rel="modulepreload" crossorigin href="./assets/window-CD2ekrnp.js">
+    <link rel="stylesheet" crossorigin href="./assets/globals-C4zKyubz.css">
+    <link rel="stylesheet" crossorigin href="./assets/main-BmbfUilT.css">
+  </head>
+
+  <body class="h-full">
+    <div id="root" class="relative h-full overflow-hidden"></div>
+  </body>
+</html>

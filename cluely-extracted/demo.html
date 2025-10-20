@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluely Chat UI Demo</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/framer-motion@11/dist/framer-motion.js"></script>
+    
+    <style>
+        /* Cluely Chat UI Styles */
+        .bg-surface-chat-footer {
+            background-color: rgba(24, 23, 28, 0.8);
+            backdrop-filter: blur(10px);
+        }
+
+        .primary-button {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            transition: all 0.15s ease;
+        }
+
+        .primary-button:hover:not(:disabled) {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .primary-button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .primary-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 4px;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(255, 255, 255, 0.7);
+        }
+
+        .shadow-xs {
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .chat-container {
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.6) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        textarea {
+            background: transparent !important;
+        }
+
+        .loading-dot {
+            animation: bounce-dot 1.4s infinite ease-in-out;
+        }
+
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce-dot {
+            0%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-8px); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+        const { motion, AnimatePresence } = Motion;
+
+        // Simple TextareaAutosize replacement
+        const TextareaAutosize = ({ value, onChange, onFocus, onBlur, onKeyDown, maxRows = 2, className, style, ...props }) => {
+            const textareaRef = useRef(null);
+
+            useEffect(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.style.height = 'auto';
+                    const scrollHeight = textareaRef.current.scrollHeight;
+                    const lineHeight = 20;
+                    const maxHeight = lineHeight * maxRows;
+                    textareaRef.current.style.height = Math.min(scrollHeight, maxHeight) + 'px';
+                }
+            }, [value, maxRows]);
+
+            return (
+                <textarea
+                    ref={textareaRef}
+                    value={value}
+                    onChange={onChange}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
+                    onKeyDown={onKeyDown}
+                    className={className}
+                    style={{ ...style, overflow: 'auto', resize: 'none' }}
+                    rows={1}
+                    {...props}
+                />
+            );
+        };
+
+        // Message Component
+        const Message = ({ side = 'left', children }) => {
+            const alignClass = side === 'left' ? 'justify-start' : 'justify-end';
+            const bgClass = side === 'left' ? 'bg-white/10' : 'bg-sky-400/60';
+            
+            return (
+                <motion.div
+                    className={`flex items-center ${alignClass}`}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                >
+                    <div className={`rounded-lg py-1.5 px-2 max-w-[80%] text-[13px] leading-[19px] ${bgClass} text-white/90 shadow-xs`}>
+                        {children}
+                    </div>
+                </motion.div>
+            );
+        };
+
+        // Keyboard Key Display
+        const KeyboardKey = ({ char }) => (
+            <div className="w-fit h-fit inline-block text-[10px] text-white/40 border rounded-md px-[3px] py-0.5">
+                {char}
+            </div>
+        );
+
+        // Chat Input Component
+        const ChatInput = ({ 
+            value, 
+            onChange, 
+            onSubmit,
+            smartMode = false,
+            onToggleSmartMode
+        }) => {
+            const [isFocused, setIsFocused] = useState(false);
+
+            const handleSubmit = () => {
+                if (value.trim()) {
+                    onSubmit?.(value);
+                }
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                }
+            };
+
+            return (
+                <div className="relative">
+                    <motion.div
+                        className="relative overflow-hidden"
+                        animate={{ height: isFocused ? "fit-content" : "40px" }}
+                        transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                    >
+                        <TextareaAutosize
+                            maxRows={2}
+                            className="relative z-10 block resize-none w-full p-2.5 rounded-t-lg focus:outline-none text-[13px] text-white scrollbar-thin"
+                            style={{ boxShadow: "0 2px 20px -1px rgba(0, 0, 0, 0.05) inset" }}
+                            value={value}
+                            onFocus={() => setIsFocused(true)}
+                            onBlur={() => setIsFocused(false)}
+                            onChange={(e) => onChange?.(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                        />
+
+                        {value === "" && (
+                            <AnimatePresence mode="popLayout">
+                                <motion.span
+                                    key={isFocused ? "expanded" : "collapsed"}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.1 }}
+                                    className="absolute top-2.5 left-2.5 right-2.5 text-[13px] pointer-events-none text-white/60"
+                                >
+                                    {isFocused ? (
+                                        <>
+                                            Ask about your screen or conversation, or{' '}
+                                            <div className="inline-flex items-center gap-1 mx-1 -translate-y-px">
+                                                <KeyboardKey char="⏎" />
+                                            </div>
+                                            for Assist
+                                        </>
+                                    ) : (
+                                        <>
+                                            Click to type, or{' '}
+                                            <div className="inline-flex items-center gap-1 mx-1 -translate-y-px">
+                                                <KeyboardKey char="⌘" />
+                                                <KeyboardKey char="K" />
+                                            </div>
+                                            for assist
+                                        </>
+                                    )}
+                                </motion.span>
+                            </AnimatePresence>
+                        )}
+                    </motion.div>
+
+                    <div className="rounded-b-lg">
+                        <div className="p-1.5 bg-surface-chat-footer rounded-b-lg flex border-white/25 border-t-[0.5px] items-center gap-2 justify-between">
+                            {onToggleSmartMode && (
+                                <button
+                                    onClick={onToggleSmartMode}
+                                    className="hover:text-white/70 hover:border-white/40 focus:outline-none"
+                                    title="Good for coding, reasoning, and web searches"
+                                >
+                                    <div className={`flex h-5 px-1.5 gap-1 items-center justify-start text-xs overflow-hidden rounded-full bg-[#18171C]/60 text-white/70 hover:text-white transition-colors ${
+                                        smartMode ? 'text-yellow-200/90 bg-yellow-300/20 border border-yellow-200/60' : ''
+                                    }`}>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="shrink-0">
+                                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                                        </svg>
+                                        <span>Smart</span>
+                                    </div>
+                                </button>
+                            )}
+
+                            <motion.div
+                                className="flex items-center gap-1.5 absolute"
+                                layout
+                                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                                style={isFocused ? { right: 8, bottom: 6 } : { right: 8, bottom: 8 }}
+                            >
+                                <button
+                                    onClick={handleSubmit}
+                                    className="w-6 h-6 gap-1 text-xs rounded-full primary-button flex items-center justify-center text-white"
+                                    disabled={!value.trim()}
+                                >
+                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                                    </svg>
+                                </button>
+                            </motion.div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Messages Container
+        const MessagesContainer = ({ messages = [], isLoading = false }) => {
+            const containerRef = useRef(null);
+
+            useEffect(() => {
+                if (containerRef.current) {
+                    containerRef.current.scrollTop = containerRef.current.scrollHeight;
+                }
+            }, [messages.length, isLoading]);
+
+            return (
+                <div
+                    ref={containerRef}
+                    className="flex-1 px-3 min-h-0 overflow-auto scrollbar-thin"
+                >
+                    {messages.length > 0 ? (
+                        <div className="flex flex-col gap-2 py-4">
+                            {messages.map((msg, index) => (
+                                <Message key={msg.id || index} side={msg.role === 'user' ? 'right' : 'left'}>
+                                    {msg.content}
+                                </Message>
+                            ))}
+                            {isLoading && (
+                                <Message side="left">
+                                    <div className="flex gap-1">
+                                        <span className="loading-dot">●</span>
+                                        <span className="loading-dot">●</span>
+                                        <span className="loading-dot">●</span>
+                                    </div>
+                                </Message>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="text-white/50 pb-0.5 leading-none text-sm py-4">
+                            Start a conversation...
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Main App
+        const App = () => {
+            const [messages, setMessages] = useState([
+                {
+                    id: 1,
+                    role: 'system',
+                    content: 'Hello! I\'m your AI assistant. How can I help you today?'
+                }
+            ]);
+            const [inputValue, setInputValue] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const [smartMode, setSmartMode] = useState(false);
+
+            const handleSubmit = (value) => {
+                if (value.trim()) {
+                    const userMessage = {
+                        id: Date.now(),
+                        role: 'user',
+                        content: value
+                    };
+                    setMessages(prev => [...prev, userMessage]);
+                    setInputValue('');
+                    
+                    // Simulate AI response
+                    setIsLoading(true);
+                    setTimeout(() => {
+                        const responses = [
+                            "That's a great question! Let me help you with that.",
+                            "I understand what you're asking. Here's what I think...",
+                            "Interesting! Let me break this down for you.",
+                            "I'd be happy to help with that. Here's my response...",
+                            `You asked: "${value}". ${smartMode ? '(Smart mode enabled) ' : ''}Here's a thoughtful response.`
+                        ];
+                        const aiMessage = {
+                            id: Date.now() + 1,
+                            role: 'system',
+                            content: responses[Math.floor(Math.random() * responses.length)]
+                        };
+                        setMessages(prev => [...prev, aiMessage]);
+                        setIsLoading(false);
+                    }, 1000 + Math.random() * 1000);
+                }
+            };
+
+            return (
+                <div className="w-full h-screen p-4">
+                    <div className="max-w-4xl mx-auto h-full flex flex-col">
+                        {/* Header */}
+                        <div className="mb-4 text-center">
+                            <h1 className="text-2xl font-bold text-white mb-2">
+                                Cluely Chat UI Demo
+                            </h1>
+                            <p className="text-white/60 text-sm">
+                                Extracted from Cluely Desktop App • Press Enter to send
+                            </p>
+                        </div>
+
+                        {/* Chat Container */}
+                        <div className="flex-1 chat-container rounded-lg overflow-hidden flex flex-col">
+                            <MessagesContainer messages={messages} isLoading={isLoading} />
+                            
+                            <div className="mt-auto">
+                                <ChatInput
+                                    value={inputValue}
+                                    onChange={setInputValue}
+                                    onSubmit={handleSubmit}
+                                    smartMode={smartMode}
+                                    onToggleSmartMode={() => setSmartMode(!smartMode)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Footer Info */}
+                        <div className="mt-4 text-center space-y-1">
+                            <p className="text-white/40 text-xs">
+                                Try: "What can you help me with?" • "Explain React hooks" • "Write a function"
+                            </p>
+                            <p className="text-white/30 text-xs">
+                                Smart Mode: {smartMode ? '✓ Enabled' : '✗ Disabled'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Render
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+

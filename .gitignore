@@ -1,42 +1,10 @@
-# Dependencies
 node_modules/
-extension/node_modules/
-api/node_modules/
-
-# Build outputs
 dist/
-build/
-extension/dist/
-api/dist/
-
-# Environment variables
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-extension/.env
-api/.env
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-logs/
-
-# OS files
 .DS_Store
-Thumbs.db
-
-# IDE
+*.log
+build/
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
 
-# Misc
-.cache/
-*.tsbuildinfo
-.vite/
+
