@@ -124,17 +124,40 @@ async function handleGetCurrentTab(sendResponse) {
 // Get all tabs
 // Helper function to convert favicon to data URL
 async function getFaviconAsDataUrl(faviconUrl) {
+  if (!faviconUrl) return null;
+  if (faviconUrl.startsWith('data:')) {
+    return faviconUrl;
+  }
+
   try {
-    const response = await fetch(faviconUrl);
+    const url = new URL(faviconUrl);
+    const protocol = url.protocol;
+
+    // Skip protocols we can't fetch or convert reliably
+    if (!['http:', 'https:'].includes(protocol)) {
+      return null;
+    }
+
+    // Local dev servers (e.g. localhost) usually block CORS for favicon fetches.
+    // Skip conversion so we fall back to the Google favicon service below.
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      return null;
+    }
+
+    const response = await fetch(faviconUrl, { credentials: 'omit' });
+    if (!response.ok) {
+      return null;
+    }
+
     const blob = await response.blob();
-    return new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result);
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
   } catch (error) {
-    console.error('Failed to fetch favicon:', faviconUrl, error);
+    console.debug('⚠️ Skipping favicon conversion:', faviconUrl, error?.message || error);
     return null;
   }
 }
