@@ -31,6 +31,15 @@
           background: rgba(0, 0, 0, 0.25);
         }
         
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        
         #speedy-input::placeholder {
           color: rgba(255, 255, 255, 0.5);
           opacity: 0.5;
@@ -194,17 +203,15 @@
           </div>
           
           <!-- Context Pills Row -->
-          <div id="speedy-context-pills" style="
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
+          <div style="
             align-items: center;
-            min-height: 20px;
-            max-height: 44px;
-            overflow: hidden;
+            display: flex;
+            gap: 4px;
+            width: 100%;
+            flex-wrap: wrap;
             margin-bottom: 4px;
           ">
-            <!-- @ Button -->
+            <!-- @ Button (Fixed Position) -->
             <div tabindex="0" id="speedy-at-button" style="
               cursor: pointer;
               display: flex;
@@ -215,14 +222,25 @@
               width: 20px;
               box-sizing: border-box;
               border-radius: 4px;
-              border: 1px solid rgba(255, 255, 255, 0.18);
+              border: 1px solid rgba(228, 228, 228, 0.11);
               outline: none;
               flex-shrink: 0;
               background: transparent;
-              transition: all 0.1s;
+              transition-property: all;
+              transition-duration: 0s;
+              transition-timing-function: ease;
+              user-select: none;
+              font-family: -apple-system, system-ui, sans-serif;
+              font-size: 13px;
+              color: rgba(228, 228, 228, 0.55);
             ">
-              <span style="font-size: 11px; color: rgba(255, 255, 255, 0.7);">@</span>
+              <span style="font-size: 11px; color: rgba(228, 228, 228, 0.55); padding-left: 0px;">@</span>
             </div>
+            
+            <!-- Context Pills Container -->
+            <div id="speedy-context-pills" style="
+              display: contents;
+            "></div>
           </div>
           
           <!-- Tab Selection Menu -->
@@ -232,18 +250,39 @@
             bottom: calc(100% + 8px);
             left: 0;
             right: 0;
-            background: rgba(255, 255, 255, 1);
-            border-radius: 12px;
-            box-shadow: rgba(0, 0, 0, 0.15) 0px 8px 24px, rgba(0, 0, 0, 0.05) 0px 2px 8px;
-            max-height: 300px;
-            overflow-y: auto;
-            padding: 8px;
             z-index: 1001;
+            flex-shrink: 0;
+            padding: 0 12px 12px;
           ">
-            <div style="padding: 8px 8px 4px; font-size: 12px; color: rgba(0,0,0,0.6); font-weight: 600; letter-spacing: 0.3px;">
-              SELECT TABS TO ADD AS CONTEXT
+            <div style="
+              display: flex;
+              justify-content: center;
+              transition: box-shadow 150ms ease-out;
+              border-radius: 17px;
+              padding: 5px;
+              background: radial-gradient(144.11% 100% at 50% 0%, rgba(250, 250, 250, 0.8) 0%, rgba(240, 240, 240, 0.6) 100%);
+              box-shadow: rgba(255, 255, 255, 0.95) 0px 1.5px 0px 0px inset, rgba(0, 0, 0, 0.09) 0px 1px 3px 0px;
+              backdrop-filter: blur(20px);
+              -webkit-backdrop-filter: blur(20px);
+              height: auto;
+            ">
+              <div style="width: 100%;">
+                <div>
+                  <div style="
+                    max-height: 276px;
+                    overflow-y: auto;
+                    opacity: 1;
+                    height: auto;
+                  " class="no-scrollbar">
+                    <div id="speedy-tab-list" style="
+                      padding-bottom: 6px;
+                      display: flex;
+                      flex-direction: column-reverse;
+                    "></div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div id="speedy-tab-list"></div>
           </div>
           
           <!-- Input Area -->
@@ -963,31 +1002,71 @@
       
       selectedTabs.push(tab);
       
-      const chip = document.createElement('div');
-      chip.className = 'context-chip';
-      chip.dataset.tabId = tab.id;
-      chip.style.cssText = `
+      // Create wrapper div (like Cursor's structure)
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = `
         display: inline-flex;
-        align-items: center;
-        height: 20px;
-        padding: 0 6px;
-        font-size: 12px;
-        background: rgba(255, 255, 255, 0.15);
-        color: rgba(255, 255, 255, 0.9);
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.1s;
-        position: relative;
         gap: 4px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        align-items: center;
       `;
       
-      const title = tab.title.length > 20 ? tab.title.substring(0, 20) + '...' : tab.title;
+      // Create pill container
+      const pillContainer = document.createElement('div');
+      pillContainer.tabIndex = 0;
+      pillContainer.dataset.tabId = tab.id;
+      pillContainer.style.cssText = `
+        display: inline-flex;
+        max-width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        flex-shrink: 0;
+        position: relative;
+        outline: none;
+        visibility: visible;
+      `;
+      
+      // Create the actual pill
+      const chip = document.createElement('div');
+      chip.className = 'context-chip';
+      chip.style.cssText = `
+        transition-property: opacity;
+        transition-duration: 0.2s;
+        transition-timing-function: ease;
+        position: relative;
+        cursor: pointer;
+        border-style: dashed;
+        border-width: 1px;
+        border-color: rgba(228, 228, 228, 0.124);
+        opacity: 1;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 4px;
+        border-radius: 4px;
+        background: transparent;
+        font-family: -apple-system, system-ui, sans-serif;
+        font-size: 12px;
+        line-height: 16px;
+        color: rgba(228, 228, 228, 0.55);
+        user-select: none;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: visible;
+        box-sizing: border-box;
+        height: 20px;
+      `;
+      
+      const title = tab.title.length > 30 ? tab.title.substring(0, 30) + '...' : tab.title;
       const favicon = tab.favIconUrl;
       
       chip.innerHTML = `
-        ${favicon ? `<img src="${favicon}" onerror="this.style.display='none';" style="width: 12px; height: 12px; flex-shrink: 0; border-radius: 2px;" />` : ''}
-        <span style="line-height: 1; font-size: 12px; color: rgba(255, 255, 255, 0.9); opacity: 0.6;">${title}</span>
+        ${favicon ? `
+          <div style="width: 16px; margin-left: -3px; margin-right: -3px; display: flex; align-items: center; justify-content: center; scale: 0.8;">
+            <img src="${favicon}" onerror="this.style.display='none';" style="width: 16px; height: 16px; border-radius: 2px;" />
+          </div>
+        ` : ''}
+        <div style="flex-shrink: 0; opacity: 1; color: rgba(255, 255, 255, 0.9); font-size: 12px;">${title}</div>
         <button class="remove-chip" style="
           margin-left: 2px;
           padding: 0;
@@ -997,10 +1076,11 @@
           display: flex;
           align-items: center;
           justify-content: center;
-          opacity: 0.4;
+          opacity: 0.5;
           transition: opacity 0.1s;
           width: 12px;
           height: 12px;
+          color: rgba(255, 255, 255, 0.9);
         ">
           <svg width="10" height="10" viewBox="0 0 512 512" fill="currentColor" style="display: block;">
             <path d="m289.94 256 95-95A24 24 0 0 0 351 127l-95 95-95-95a24 24 0 0 0-34 34l95 95-95 95a24 24 0 1 0 34 34l95-95 95 95a24 24 0 0 0 34-34z"/>
@@ -1009,25 +1089,29 @@
       `;
       
       chip.addEventListener('mouseenter', () => {
-        chip.style.background = 'rgba(255, 255, 255, 0.25)';
+        chip.style.background = 'rgba(255, 255, 255, 0.2)';
+        chip.style.opacity = '1';
         const removeBtn = chip.querySelector('.remove-chip');
-        if (removeBtn) removeBtn.style.opacity = '0.8';
+        if (removeBtn) removeBtn.style.opacity = '1';
       });
       
       chip.addEventListener('mouseleave', () => {
-        chip.style.background = 'rgba(255, 255, 255, 0.15)';
+        chip.style.background = 'rgba(255, 255, 255, 0.1)';
+        chip.style.opacity = '1';
         const removeBtn = chip.querySelector('.remove-chip');
-        if (removeBtn) removeBtn.style.opacity = '0.4';
+        if (removeBtn) removeBtn.style.opacity = '0.5';
       });
       
       chip.querySelector('.remove-chip').addEventListener('click', (e) => {
         e.stopPropagation();
         selectedTabs = selectedTabs.filter(t => t.id !== tab.id);
-        chip.remove();
+        wrapper.remove();
         syncContextToContentScript();
       });
       
-      contextPills.insertBefore(chip, atButton);
+      pillContainer.appendChild(chip);
+      wrapper.appendChild(pillContainer);
+      contextPills.appendChild(wrapper);
       syncContextToContentScript();
     }
     
@@ -1043,60 +1127,103 @@
       tabList.innerHTML = '';
       
       tabs.forEach(tab => {
-        const tabItem = document.createElement('div');
-        tabItem.style.cssText = `
-          padding: 8px 10px;
-          margin: 1px 0;
-          border-radius: 8px;
+        const isSelected = selectedTabs.find(t => t.id === tab.id);
+        
+        // Create wrapper div
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = `
+          position: relative;
           cursor: pointer;
-          transition: background 0.1s;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background: rgba(255, 255, 255, 1);
+          display: block;
+          width: 100%;
+          border-radius: 10px;
+          transition: opacity 150ms;
+          ${isSelected ? 'background: rgba(0, 0, 0, 0.05); opacity: 1;' : 'opacity: 0.8;'}
         `;
         
-        const isSelected = selectedTabs.find(t => t.id === tab.id);
-        if (isSelected) {
-          tabItem.style.background = 'rgba(248, 248, 248, 1)';
-        }
+        // Create button
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.style.cssText = `
+          display: block;
+          width: 100%;
+          text-align: left;
+          padding: 6px 8px;
+          font-size: 13px;
+          display: flex;
+          align-items: center;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          transition: colors 150ms;
+          border-radius: 15px;
+          border: none;
+          background: transparent;
+          cursor: pointer;
+        `;
         
         const title = tab.title || 'Untitled';
-        const displayTitle = title.length > 60 ? title.substring(0, 60) + '...' : title;
-        const favicon = tab.favIconUrl;
+        const displayTitle = title.length > 25 ? title.substring(0, 25) + '...' : title;
+        const url = tab.url || '';
+        const displayUrl = url.length > 40 ? url.substring(0, 40) + '...' : url;
         
-        tabItem.innerHTML = `
-          ${favicon ? `<img src="${favicon}" onerror="this.style.display='none';" style="width: 16px; height: 16px; flex-shrink: 0; border-radius: 2px;" />` : ''}
-          <div style="flex: 1; font-size: 13px; color: #000; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-            ${displayTitle}
-          </div>
-          <div style="
-            width: 18px;
-            height: 18px;
-            border-radius: 4px;
-            background: ${isSelected ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0,0,0,0.08)'};
+        // Get favicon URL
+        let faviconUrl = tab.favIconUrl;
+        if (!faviconUrl && url) {
+          try {
+            const urlObj = new URL(url);
+            faviconUrl = `${urlObj.origin}/favicon.ico`;
+          } catch (e) {
+            faviconUrl = '';
+          }
+        }
+        
+        button.innerHTML = `
+          <span style="
+            margin-right: 6px;
+            flex-shrink: 0;
+            width: 13px;
+            height: 13px;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-shrink: 0;
           ">
-            ${isSelected ? '<span style="color: white; font-size: 11px;">✓</span>' : ''}
-          </div>
+            ${faviconUrl ? `<img alt="${title}" width="13" height="13" src="${faviconUrl}" onerror="this.style.display='none';" style="object-fit: contain;" />` : ''}
+          </span>
+          <div style="
+            color: rgba(0, 0, 0, 0.85);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex-shrink: 0;
+          ">${displayTitle}</div>
+          <div style="
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-left: 8px;
+          ">${displayUrl}</div>
         `;
         
-        tabItem.addEventListener('mouseenter', () => {
+        // Hover effects
+        wrapper.addEventListener('mouseenter', () => {
           if (!isSelected) {
-            tabItem.style.background = 'rgba(245, 245, 245, 1)';
+            wrapper.style.opacity = '1';
+            wrapper.style.background = 'rgba(0, 0, 0, 0.05)';
           }
         });
         
-        tabItem.addEventListener('mouseleave', () => {
+        wrapper.addEventListener('mouseleave', () => {
           if (!isSelected) {
-            tabItem.style.background = 'rgba(255, 255, 255, 1)';
+            wrapper.style.opacity = '0.8';
+            wrapper.style.background = 'transparent';
           }
         });
         
-        tabItem.addEventListener('click', () => {
+        // Click handler
+        button.addEventListener('click', () => {
           if (isSelected) {
             selectedTabs = selectedTabs.filter(t => t.id !== tab.id);
             const chip = shadowRoot.querySelector(`[data-tab-id="${tab.id}"]`);
@@ -1108,7 +1235,8 @@
           renderTabList(availableTabs);
         });
         
-        tabList.appendChild(tabItem);
+        wrapper.appendChild(button);
+        tabList.appendChild(wrapper);
       });
     }
     
