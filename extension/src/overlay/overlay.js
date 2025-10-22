@@ -182,7 +182,7 @@
         pointer-events: none;
       ">
         <!-- Main Container -->
-        <form id="speedy-form" style="
+        <form id="speedy-form" action="javascript:void(0)" onsubmit="return false;" style="
           background: color-mix(in srgb, rgba(255, 255, 255, 0.08) 90%, transparent);
           backdrop-filter: blur(20px) saturate(1.05);
           -webkit-backdrop-filter: blur(20px) saturate(1.05);
