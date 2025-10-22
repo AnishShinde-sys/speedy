@@ -319,23 +319,19 @@ function setupMessageHandlers() {
 async function handleMessage(message, sendResponse) {
     switch (message.type) {
         case "get_page_content":
-            // Use immediate Promise to prevent context from becoming inactive
-            (async () => {
-                try {
-                    const content = await extractPageContent();
-                    sendResponse({
-                        success: true,
-                        context: content
-                    });
-                } catch (error) {
-                    console.error("❌ [SPEEDY] get_page_content failed", error);
-                    sendResponse({
-                        success: false,
-                        error: error.message
-                    });
-                }
-            })();
-            return; // Return immediately from switch
+            try {
+                const content = await extractPageContent();
+                sendResponse({
+                    success: true,
+                    context: content
+                });
+            } catch (error) {
+                console.error("❌ [SPEEDY] get_page_content failed", error);
+                sendResponse({
+                    success: false,
+                    error: error.message
+                });
+            }
             break;
             
         case "get_selected_text":
