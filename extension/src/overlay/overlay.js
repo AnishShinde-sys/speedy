@@ -885,12 +885,14 @@
     }
     
     async function sendMessageToAPI(messageText, contexts = []) {
+      console.log('🔥 [Overlay] sendMessageToAPI called, isVisible:', isVisible);
       const chatId = await ensureChat();
       if (!chatId) {
-        console.error('Failed to create chat');
+        console.error('🔥 [Overlay] Failed to create chat');
         return;
       }
       
+      console.log('🔥 [Overlay] Adding user message to UI');
       addMessageToUI('user', messageText);
       
       await apiRequest('POST', `/api/chats/${chatId}/message`, {
@@ -978,9 +980,12 @@
     
     // Toggle overlay visibility
     function toggleOverlay() {
+      console.log('🔥 [Overlay] toggleOverlay called, current isVisible:', isVisible);
+      console.trace('🔥 [Overlay] Toggle stack trace');
       isVisible = !isVisible;
       
       if (isVisible) {
+        console.log('🔥 [Overlay] Showing overlay');
         overlay.style.opacity = '1';
         overlay.style.transform = 'translateX(-50%) translateY(0)';
         overlay.style.pointerEvents = 'auto';
@@ -991,6 +996,7 @@
           input.focus();
         }, 100);
       } else {
+        console.log('🔥 [Overlay] Hiding overlay');
         overlay.style.opacity = '0';
         overlay.style.transform = 'translateX(-50%) translateY(20px)';
         overlay.style.pointerEvents = 'none';
@@ -1620,11 +1626,20 @@
     
     // Form submit handler
     form.addEventListener('submit', async (e) => {
+        console.log('🔥 [Overlay] Form submit triggered');
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        console.log('🔥 [Overlay] preventDefault called, isVisible:', isVisible);
       
-      if (!message.trim() || isStreaming) return;
+      if (!message.trim() || isStreaming) {
+        console.log('🔥 [Overlay] Submit blocked - empty message or streaming');
+        return;
+      }
       
       const messageToSend = message.trim();
+      console.log('🔥 [Overlay] Message to send:', messageToSend);
+      console.log('🔥 [Overlay] Selected tabs:', selectedTabs.length);
       
       // Build context from tabs - fetch actual content via background script
       const contextsToSend = [];
@@ -1667,6 +1682,7 @@
           });
           
           const content = await contentResponse;
+          console.log('🔥 [Overlay] Got content for tab', tab.id, ':', content.length, 'chars');
           
           contextsToSend.push({
             type: 'tab',
@@ -1679,8 +1695,8 @@
             }
           });
         } catch (error) {
-          console.error('Error fetching tab content:', error);
-          // Add tab without content if fetch fails
+          console.warn('🔥 [Overlay] Failed to fetch tab content for', tab.title, '- continuing without content:', error.message);
+          // Add tab without content if fetch fails - DON'T let this break the flow
           contextsToSend.push({
             type: 'tab',
             data: {
@@ -1706,6 +1722,7 @@
         });
       });
       
+      console.log('🔥 [Overlay] Clearing input field, contexts ready:', contextsToSend.length);
       message = '';
       input.textContent = '';
       button.disabled = true;
@@ -1716,11 +1733,14 @@
       capturedScreenshots = [];
       shadowRoot.querySelectorAll('.screenshot-chip').forEach(chip => chip.remove());
       
+      console.log('🔥 [Overlay] About to send to API, isVisible:', isVisible);
       try {
         await sendMessageToAPI(messageToSend, contextsToSend);
+        console.log('🔥 [Overlay] API call completed, isVisible:', isVisible);
       } catch (error) {
-        console.error('Error sending message:', error);
+        console.error('🔥 [Overlay] Error sending message:', error);
       }
+      console.log('🔥 [Overlay] Submit handler completed, isVisible:', isVisible);
     });
     
     

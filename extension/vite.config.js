@@ -76,15 +76,15 @@ export default defineConfig(({ mode }) => {
               content = content.replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, '');
               content = content.replace(/^export\s+.*?$/gm, '');
               
-              // For Firefox background scripts, don't wrap in IIFE to preserve global browser object
-              const shouldWrap = !(isFirefox && file === 'background/service-worker.js');
+              // For Firefox, don't wrap background or content scripts to preserve global browser object
+              const shouldWrap = !(isFirefox && (file === 'background/service-worker.js' || file === 'content/content-script.js'));
               
-              // Wrap in IIFE if not already wrapped (except Firefox background)
+              // Wrap in IIFE if not already wrapped (except Firefox background/content)
               if (shouldWrap && !content.trim().startsWith('(function()') && !content.trim().startsWith('(()')) {
                 content = `(function() {\n'use strict';\n${content}\n})();`;
                 console.log(`✅ Wrapped ${file} in IIFE`);
               } else if (!shouldWrap) {
-                console.log(`⏭️ Skipped wrapping ${file} (Firefox background script)`);
+                console.log(`⏭️ Skipped wrapping ${file} (Firefox - needs global scope)`);
               }
               
               writeFileSync(filePath, content);

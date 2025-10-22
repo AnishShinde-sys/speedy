@@ -319,19 +319,23 @@ function setupMessageHandlers() {
 async function handleMessage(message, sendResponse) {
     switch (message.type) {
         case "get_page_content":
-            try {
-                const content = await extractPageContent();
-                sendResponse({
-                    success: true,
-                    context: content
-                });
-            } catch (error) {
-                console.error("❌ [SPEEDY] get_page_content failed", error);
-                sendResponse({
-                    success: false,
-                    error: error.message
-                });
-            }
+            // Use immediate Promise to prevent context from becoming inactive
+            (async () => {
+                try {
+                    const content = await extractPageContent();
+                    sendResponse({
+                        success: true,
+                        context: content
+                    });
+                } catch (error) {
+                    console.error("❌ [SPEEDY] get_page_content failed", error);
+                    sendResponse({
+                        success: false,
+                        error: error.message
+                    });
+                }
+            })();
+            return; // Return immediately from switch
             break;
             
         case "get_selected_text":
@@ -463,7 +467,7 @@ function handleStateChange(data) {
 }
 
 // Listen for messages from overlay (page context) and relay to background
-window.addEventListener('message', async (event) => {
+window.addEventListener('message', (event) => {
     // Only accept messages from same window
     if (event.source !== window) return;
     
@@ -473,38 +477,41 @@ window.addEventListener('message', async (event) => {
         const selectedTabs = event.data.selectedTabs || [];
         const model = event.data.model || 'anthropic/claude-3.5-sonnet';
         
-        // Store message, selected tabs, and model in chrome storage
-        if (browser && browser.storage) {
-            await browser.storage.local.set({ 
-                sharedState: { 
-                    currentMessage: message,
-                    pendingMessage: message,
-                    selectedTabs: selectedTabs,
-                    selectedModel: model
-                }
-            });
-        }
-        
-        // Request to open sidepanel with message, context, and model
-        if (browser && browser.runtime) {
-            try {
-                // Try to open sidepanel
-                const response = await browser.runtime.sendMessage({
-                    type: 'OPEN_SIDEPANEL_WITH_MESSAGE',
-                    message: message,
-                    selectedTabs: selectedTabs,
-                    model: model
+        // Use IIFE to handle async without blocking
+        (async () => {
+            // Store message, selected tabs, and model in chrome storage
+            if (browser && browser.storage) {
+                await browser.storage.local.set({ 
+                    sharedState: { 
+                        currentMessage: message,
+                        pendingMessage: message,
+                        selectedTabs: selectedTabs,
+                        selectedModel: model
+                    }
                 });
-                
-                if (response && !response.success) {
-                    // If failed, show a notification to use Cmd+B
-                    console.log('Tip: Click the extension icon or press Cmd+B to open the sidepanel');
-                }
-            } catch (err) {
-                console.error("❌ [SPEEDY] Failed to send message to background:", err);
-                console.log('Please click the extension icon to open the sidepanel');
             }
-        }
+            
+            // Request to open sidepanel with message, context, and model
+            if (browser && browser.runtime) {
+                try {
+                    // Try to open sidepanel
+                    const response = await browser.runtime.sendMessage({
+                        type: 'OPEN_SIDEPANEL_WITH_MESSAGE',
+                        message: message,
+                        selectedTabs: selectedTabs,
+                        model: model
+                    });
+                    
+                    if (response && !response.success) {
+                        // If failed, show a notification to use Cmd+B
+                        console.log('Tip: Click the extension icon or press Cmd+B to open the sidepanel');
+                    }
+                } catch (err) {
+                    console.error("❌ [SPEEDY] Failed to send message to background:", err);
+                    console.log('Please click the extension icon to open the sidepanel');
+                }
+            }
+        })();
     }
     
     // Handle message changes from overlay
@@ -537,23 +544,25 @@ window.addEventListener('message', async (event) => {
     
     // Handle tab requests from overlay
     if (event.data.type === 'SPEEDY_REQUEST_TABS') {
-        // Request tabs from background script
+        // Use IIFE to handle async without blocking
         if (browser && browser.runtime) {
-            try {
-                const response = await browser.runtime.sendMessage({
-                    type: 'GET_ALL_TABS'
-                });
-                
-                if (response && response.success) {
-                    // Send tabs back to overlay
-                    window.postMessage({
-                        type: 'SPEEDY_TABS_RESPONSE',
-                        tabs: response.tabs
-                    }, '*');
+            (async () => {
+                try {
+                    const response = await browser.runtime.sendMessage({
+                        type: 'GET_ALL_TABS'
+                    });
+                    
+                    if (response && response.success) {
+                        // Send tabs back to overlay
+                        window.postMessage({
+                            type: 'SPEEDY_TABS_RESPONSE',
+                            tabs: response.tabs
+                        }, '*');
+                    }
+                } catch (err) {
+                    console.log('Failed to get tabs:', err.message);
                 }
-            } catch (err) {
-                console.log('Failed to get tabs:', err.message);
-            }
+            })();
         }
     }
     
@@ -577,37 +586,40 @@ window.addEventListener('message', async (event) => {
             }
         }
         
+        // Use IIFE to handle async without blocking the event listener
         if (browser && browser.runtime) {
-            try {
-                const response = await browser.runtime.sendMessage({
-                    type: 'API_REQUEST',
-                    method,
-                    endpoint,
-                    body
-                });
-                
-                if (response.error) {
-                    console.log("❌ [SPEEDY] Error:", response.error);
+            (async () => {
+                try {
+                    const response = await browser.runtime.sendMessage({
+                        type: 'API_REQUEST',
+                        method,
+                        endpoint,
+                        body
+                    });
+                    
+                    if (response.error) {
+                        console.log("❌ [SPEEDY] Error:", response.error);
+                    }
+                    
+                    // Send response back to overlay
+                    window.postMessage({
+                        type: 'SPEEDY_API_RESPONSE',
+                        requestId,
+                        success: response.success,
+                        data: response.data,
+                        error: response.error
+                    }, '*');
+                } catch (err) {
+                    console.error("❌ [SPEEDY] API request failed:", err);
+                    // Send error back to overlay
+                    window.postMessage({
+                        type: 'SPEEDY_API_RESPONSE',
+                        requestId,
+                        success: false,
+                        error: err.message || 'API request failed'
+                    }, '*');
                 }
-                
-                // Send response back to overlay
-                window.postMessage({
-                    type: 'SPEEDY_API_RESPONSE',
-                    requestId,
-                    success: response.success,
-                    data: response.data,
-                    error: response.error
-                }, '*');
-            } catch (err) {
-                console.error("❌ [SPEEDY] API request failed:", err);
-                // Send error back to overlay
-                window.postMessage({
-                    type: 'SPEEDY_API_RESPONSE',
-                    requestId,
-                    success: false,
-                    error: err.message || 'API request failed'
-                }, '*');
-            }
+            })();
         }
     }
     
@@ -615,29 +627,32 @@ window.addEventListener('message', async (event) => {
     if (event.data.type === 'SPEEDY_CAPTURE_SCREENSHOT') {
         const { requestId } = event.data;
         
+        // Use IIFE to handle async without blocking
         if (browser && browser.runtime) {
-            try {
-                const response = await browser.runtime.sendMessage({
-                    type: 'CAPTURE_SCREENSHOT'
-                });
-                
-                // Send response back to overlay
-                window.postMessage({
-                    type: 'SPEEDY_SCREENSHOT_RESPONSE',
-                    requestId,
-                    success: response.success,
-                    dataUrl: response.dataUrl,
-                    error: response.error
-                }, '*');
-            } catch (err) {
-                // Send error back to overlay
-                window.postMessage({
-                    type: 'SPEEDY_SCREENSHOT_RESPONSE',
-                    requestId,
-                    success: false,
-                    error: err.message || 'Screenshot capture failed'
-                }, '*');
-            }
+            (async () => {
+                try {
+                    const response = await browser.runtime.sendMessage({
+                        type: 'CAPTURE_SCREENSHOT'
+                    });
+                    
+                    // Send response back to overlay
+                    window.postMessage({
+                        type: 'SPEEDY_SCREENSHOT_RESPONSE',
+                        requestId,
+                        success: response.success,
+                        dataUrl: response.dataUrl,
+                        error: response.error
+                    }, '*');
+                } catch (err) {
+                    // Send error back to overlay
+                    window.postMessage({
+                        type: 'SPEEDY_SCREENSHOT_RESPONSE',
+                        requestId,
+                        success: false,
+                        error: err.message || 'Screenshot capture failed'
+                    }, '*');
+                }
+            })();
         }
     }
     
@@ -645,31 +660,34 @@ window.addEventListener('message', async (event) => {
     if (event.data.type === 'SPEEDY_EXTRACT_TAB_CONTENT') {
         const { requestId, tabId } = event.data;
         
+        // Use IIFE to handle async without blocking
         if (browser && browser.runtime) {
-            try {
-                const response = await browser.runtime.sendMessage({
-                    type: 'EXTRACT_TAB_CONTENT',
-                    tabId: tabId
-                });
-                
-                // Send response back to overlay
-                window.postMessage({
-                    type: 'SPEEDY_EXTRACT_RESPONSE',
-                    requestId,
-                    success: response.success,
-                    content: response.content,
-                    error: response.error
-                }, '*');
-            } catch (err) {
-                console.error("❌ [SPEEDY] Tab content extraction failed:", err);
-                // Send error back to overlay
-                window.postMessage({
-                    type: 'SPEEDY_EXTRACT_RESPONSE',
-                    requestId,
-                    success: false,
-                    error: err.message || 'Content extraction failed'
-                }, '*');
-            }
+            (async () => {
+                try {
+                    const response = await browser.runtime.sendMessage({
+                        type: 'EXTRACT_TAB_CONTENT',
+                        tabId: tabId
+                    });
+                    
+                    // Send response back to overlay
+                    window.postMessage({
+                        type: 'SPEEDY_EXTRACT_RESPONSE',
+                        requestId,
+                        success: response.success,
+                        content: response.content,
+                        error: response.error
+                    }, '*');
+                } catch (err) {
+                    console.error("❌ [SPEEDY] Tab content extraction failed:", err);
+                    // Send error back to overlay
+                    window.postMessage({
+                        type: 'SPEEDY_EXTRACT_RESPONSE',
+                        requestId,
+                        success: false,
+                        error: err.message || 'Content extraction failed'
+                    }, '*');
+                }
+            })();
         }
     }
 });
