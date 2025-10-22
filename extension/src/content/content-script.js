@@ -435,22 +435,8 @@ function insertTextAtCursor(text) {
 // Prevent multiple injections
 if (window.__SPEEDY_CONTENT_SCRIPT_LOADED__) {
     console.log('⚠️ Content script already loaded, skipping re-initialization');
-    console.log('🔍 [DEBUG] Page URL:', window.location.href);
-    console.log('🔍 [DEBUG] Document ready state:', document.readyState);
 } else {
-    console.log('🔥 [DEBUG] FIRST TIME LOADING content script');
-    console.log('🔍 [DEBUG] Page URL:', window.location.href);
-    console.log('🔍 [DEBUG] Document ready state:', document.readyState);
     window.__SPEEDY_CONTENT_SCRIPT_LOADED__ = true;
-    
-    // Debug: Detect page unload/reload
-    window.addEventListener('beforeunload', () => {
-        console.log('🚨 [DEBUG] PAGE IS UNLOADING/RELOADING!');
-    });
-    
-    window.addEventListener('unload', () => {
-        console.log('🚨 [DEBUG] PAGE UNLOADED!');
-    });
 
 let overlayInjected = false;
 
