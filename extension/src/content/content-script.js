@@ -1,5 +1,10 @@
-// Extracted Content Functions from main.js
-// These are the key functions for content extraction from websites
+// Speedy AI Content Script
+// Content extraction and overlay management for browser extension
+
+"use strict";
+
+// Browser compatibility layer - use window.browser if available (Firefox with polyfill), else chrome
+var browser = (typeof window.browser !== 'undefined') ? window.browser : chrome;
 
 // =======================
 // 1. VIEWPORT MARKING FUNCTIONS
@@ -112,63 +117,109 @@ function markViewportElements(offset = 0) {
 }
 
 // =======================
-// 2. PDF DETECTION & EXTRACTION
+// 2. CONTENT EXTRACTION (NO LIMITS)
 // =======================
 
-// Get PDF URL from the page
-function getPdfUrl() {
-    const contentType = document.contentType;
-    if (typeof contentType === "string" && contentType.toLowerCase().includes("application/pdf")) {
-        return window.location.href;
-    }
+// Extract metadata from the page
+function extractMetadata(url) {
+    const metadata = {};
     
-    const embedPdf = document.querySelector('embed[type="application/pdf"]');
-    if (embedPdf?.src) {
-        console.info("PDF URL extracted from <embed> src:", embedPdf.src);
-        return embedPdf.src;
-    }
+    // Extract meta tags
+    const description = document.querySelector('meta[name="description"]')?.content;
+    if (description) metadata.description = description;
     
-    const objectPdf = document.querySelector('object[type="application/pdf"]');
-    if (objectPdf?.data) {
-        console.info("PDF URL extracted from <object> data:", objectPdf.data);
-        return objectPdf.data;
-    }
+    const keywords = document.querySelector('meta[name="keywords"]')?.content;
+    if (keywords) metadata.keywords = keywords;
     
-    return window.location.href;
+    const author = document.querySelector('meta[name="author"]')?.content;
+    if (author) metadata.author = author;
+    
+    // Extract Open Graph tags
+    const ogTitle = document.querySelector('meta[property="og:title"]')?.content;
+    if (ogTitle) metadata.ogTitle = ogTitle;
+    
+    const ogDescription = document.querySelector('meta[property="og:description"]')?.content;
+    if (ogDescription) metadata.ogDescription = ogDescription;
+    
+    const ogImage = document.querySelector('meta[property="og:image"]')?.content;
+    if (ogImage) metadata.ogImage = ogImage;
+    
+    // Extract Twitter Card tags
+    const twitterTitle = document.querySelector('meta[name="twitter:title"]')?.content;
+    if (twitterTitle) metadata.twitterTitle = twitterTitle;
+    
+    const twitterDescription = document.querySelector('meta[name="twitter:description"]')?.content;
+    if (twitterDescription) metadata.twitterDescription = twitterDescription;
+    
+    return metadata;
 }
 
-// Check if current page is a PDF
-function isPdfPage() {
-    const contentType = document.contentType;
-    return !!(
-        (typeof contentType === "string" && contentType.toLowerCase().includes("application/pdf")) ||
-        window.PDFViewerApplication ||
-        document.querySelector('embed[type="application/pdf"], object[type="application/pdf"]')
-    );
-}
-
-// Extract PDF content (requires pdf.js library)
-async function extractPdfContent(url) {
+// Main function to extract page content (NO LIMITS!)
+async function extractPageContent() {
+    const url = window.location.href;
+    const title = document.title;
+    
+    console.log("📄 [SPEEDY] Extracting content from:", title);
+    
     try {
-        let pdfContent;
-        
-        if (window.PDFViewerApplication?.pdfDocument) {
-            console.info("📄 Using existing PDF.js viewer");
-            // Extract from existing PDF viewer
-            pdfContent = await extractFromPdfViewer();
-        } else {
-            console.info("🔧 Parsing PDF directly from URL via pdf.js");
-            // Parse PDF from URL
-            pdfContent = await parsePdfFromUrl(url);
-        }
-        
-        return `<pdf_document is_pdf="true">
-    ${pdfContent}
-</pdf_document>`;
+        markViewportElements();
     } catch (error) {
-        console.error("Error extracting PDF content:", error);
-        return "";
+        console.error("[content] Error marking viewport elements:", error);
     }
+    
+    // Extract ALL visible text (no limits)
+    const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+        {
+            acceptNode: (node) => {
+                const parent = node.parentElement;
+                if (!parent) return NodeFilter.FILTER_REJECT;
+                
+                const tagName = parent.tagName.toLowerCase();
+                if (tagName === "script" || 
+                    tagName === "style" || 
+                    tagName === "noscript") {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                
+                const styles = window.getComputedStyle(parent);
+                if (styles.display === "none" || 
+                    styles.visibility === "hidden") {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                
+                const text = node.textContent?.trim();
+                return text ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+            }
+        }
+    );
+    
+    const textParts = [];
+    let node;
+    while (node = walker.nextNode()) {
+        textParts.push(node.textContent.trim());
+    }
+    
+    const content = textParts.join(" ");
+    
+    try {
+        cleanupViewportMarkers();
+    } catch (error) {
+        console.error("[content] Error cleaning up viewport markers:", error);
+    }
+    
+    const result = {
+        url: url,
+        title: title,
+        content: content,
+        metadata: extractMetadata(url)
+    };
+    
+    console.log("✅ [SPEEDY] Content extracted:", content.length, "chars");
+    console.log("📄 [SPEEDY] Extracted content:\n", content);
+    
+    return result;
 }
 
 // =======================
@@ -252,144 +303,13 @@ function clearHighlights() {
 }
 
 // =======================
-// 4. MAIN CONTENT EXTRACTION
-// =======================
-
-// Extract metadata from the page
-function extractMetadata(url) {
-    const metadata = {};
-    
-    // Extract meta tags
-    const description = document.querySelector('meta[name="description"]')?.content;
-    if (description) metadata.description = description;
-    
-    const keywords = document.querySelector('meta[name="keywords"]')?.content;
-    if (keywords) metadata.keywords = keywords;
-    
-    const author = document.querySelector('meta[name="author"]')?.content;
-    if (author) metadata.author = author;
-    
-    // Extract Open Graph tags
-    const ogTitle = document.querySelector('meta[property="og:title"]')?.content;
-    if (ogTitle) metadata.ogTitle = ogTitle;
-    
-    const ogDescription = document.querySelector('meta[property="og:description"]')?.content;
-    if (ogDescription) metadata.ogDescription = ogDescription;
-    
-    const ogImage = document.querySelector('meta[property="og:image"]')?.content;
-    if (ogImage) metadata.ogImage = ogImage;
-    
-    // Extract Twitter Card tags
-    const twitterTitle = document.querySelector('meta[name="twitter:title"]')?.content;
-    if (twitterTitle) metadata.twitterTitle = twitterTitle;
-    
-    const twitterDescription = document.querySelector('meta[name="twitter:description"]')?.content;
-    if (twitterDescription) metadata.twitterDescription = twitterDescription;
-    
-    return metadata;
-}
-
-// Main function to extract page content
-async function extractPageContent() {
-    const url = window.location.href;
-    const title = document.title;
-    const isPdf = isPdfPage();
-    
-    let content;
-    
-    if (isPdf) {
-        const pdfUrl = getPdfUrl();
-        content = await extractPdfContent(pdfUrl);
-    } else {
-        try {
-            // Mark viewport elements for extraction
-            markViewportElements();
-        } catch (error) {
-            console.error("[content] Error marking viewport elements:", error);
-        }
-        
-        // Extract HTML content
-        const rawHtml = document.documentElement.innerHTML;
-        const metadata = extractMetadata(url);
-        
-        content = processHtmlContent({
-            url: url,
-            title: title,
-            rawHtml: rawHtml,
-            metadata: metadata
-        });
-        
-        try {
-            // Clean up viewport markers
-            cleanupViewportMarkers();
-        } catch (error) {
-            console.error("[content] Error cleaning up viewport markers:", error);
-        }
-    }
-    
-    const result = {
-        url: url,
-        title: title,
-        content: content,
-        metadata: {
-            ...(!isPdf ? extractMetadata(url) : {}),
-            isPdf: isPdf
-        }
-    };
-    
-    console.info("✅ Content processing complete:", {
-        url: url,
-        title: title.substring(0, 50) + (title.length > 50 ? "..." : ""),
-        contentLength: content.length,
-        isPdf: isPdf
-    });
-    
-    return result;
-}
-
-// Process HTML content and extract structured text
-function processHtmlContent(options) {
-    const { rawHtml } = options;
-    
-    // Create a temporary container to parse HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = rawHtml;
-    
-    // Remove script and style elements
-    tempDiv.querySelectorAll('script, style, noscript').forEach(el => el.remove());
-    
-    // Extract structured content
-    const title = document.title;
-    const metaDescription = document.querySelector('meta[name="description"]')?.content || '';
-    const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
-        .map(h => h.textContent?.trim())
-        .filter(Boolean);
-    const paragraphs = Array.from(document.querySelectorAll('p'))
-        .map(p => p.textContent?.trim())
-        .filter(Boolean);
-    const listItems = Array.from(document.querySelectorAll('li'))
-        .map(li => li.textContent?.trim())
-        .filter(Boolean);
-    
-    // Combine content with structure
-    let content = `Title: ${title}\n`;
-    if (metaDescription) content += `Description: ${metaDescription}\n`;
-    if (headings.length > 0) content += `\nHeadings:\n${headings.slice(0, 10).join('\n')}\n`;
-    if (paragraphs.length > 0) content += `\nContent:\n${paragraphs.slice(0, 20).join('\n\n')}\n`;
-    if (listItems.length > 0) content += `\nList Items:\n${listItems.slice(0, 15).join('\n')}\n`;
-    
-    // Limit content size to 8000 characters
-    return content.substring(0, 8000);
-}
-
-// =======================
-// 5. MESSAGE HANDLERS
+// 4. MESSAGE HANDLERS
 // =======================
 
 // Handle messages from extension
 function setupMessageHandlers() {
-    if (typeof chrome !== 'undefined' && chrome.runtime) {
-        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (browser && browser.runtime) {
+        browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
             handleMessage(message, sendResponse);
             return true; // Keep message channel open for async response
         });
@@ -406,7 +326,7 @@ async function handleMessage(message, sendResponse) {
                     context: content
                 });
             } catch (error) {
-                console.error("[content] get_page_content failed", error);
+                console.error("❌ [SPEEDY] get_page_content failed", error);
                 sendResponse({
                     success: false,
                     error: error.message
@@ -447,6 +367,7 @@ async function handleMessage(message, sendResponse) {
             break;
             
         case "toggle_overlay":
+            console.log('📨 [Content] Received toggle_overlay message, forwarding to overlay');
             // Notify overlay to toggle visibility
             window.postMessage({
                 type: 'SPEEDY_TOGGLE_OVERLAY'
@@ -504,8 +425,14 @@ function insertTextAtCursor(text) {
 }
 
 // =======================
-// OVERLAY INJECTION
+// 5. OVERLAY INJECTION
 // =======================
+
+// Prevent multiple injections
+if (window.__SPEEDY_CONTENT_SCRIPT_LOADED__) {
+    console.log('⚠️ Content script already loaded, skipping re-initialization');
+} else {
+    window.__SPEEDY_CONTENT_SCRIPT_LOADED__ = true;
 
 let overlayInjected = false;
 
@@ -519,8 +446,7 @@ function injectOverlay() {
     
     // Inject the overlay script
     const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('overlay/overlay.js');
-    // Remove type="module" since it's now a regular script
+    script.src = browser.runtime.getURL('overlay/overlay.js');
     document.body.appendChild(script);
     
     overlayInjected = true;
@@ -548,8 +474,8 @@ window.addEventListener('message', async (event) => {
         const model = event.data.model || 'anthropic/claude-3.5-sonnet';
         
         // Store message, selected tabs, and model in chrome storage
-        if (typeof chrome !== 'undefined' && chrome.storage) {
-            await chrome.storage.local.set({ 
+        if (browser && browser.storage) {
+            await browser.storage.local.set({ 
                 sharedState: { 
                     currentMessage: message,
                     pendingMessage: message,
@@ -560,10 +486,10 @@ window.addEventListener('message', async (event) => {
         }
         
         // Request to open sidepanel with message, context, and model
-        if (typeof chrome !== 'undefined' && chrome.runtime) {
+        if (browser && browser.runtime) {
             try {
                 // Try to open sidepanel
-                const response = await chrome.runtime.sendMessage({
+                const response = await browser.runtime.sendMessage({
                     type: 'OPEN_SIDEPANEL_WITH_MESSAGE',
                     message: message,
                     selectedTabs: selectedTabs,
@@ -575,6 +501,7 @@ window.addEventListener('message', async (event) => {
                     console.log('Tip: Click the extension icon or press Cmd+B to open the sidepanel');
                 }
             } catch (err) {
+                console.error("❌ [SPEEDY] Failed to send message to background:", err);
                 console.log('Please click the extension icon to open the sidepanel');
             }
         }
@@ -585,11 +512,11 @@ window.addEventListener('message', async (event) => {
         const message = event.data.message;
         
         // Sync with storage
-        if (typeof chrome !== 'undefined' && chrome.storage) {
-            chrome.storage.local.get(['sharedState'], (result) => {
+        if (browser && browser.storage) {
+            browser.storage.local.get(['sharedState'], (result) => {
                 const sharedState = result.sharedState || {};
                 sharedState.currentMessage = message;
-                chrome.storage.local.set({ sharedState });
+                browser.storage.local.set({ sharedState });
             });
         }
     }
@@ -599,11 +526,11 @@ window.addEventListener('message', async (event) => {
         const selectedTabs = event.data.selectedTabs || [];
         
         // Sync with storage
-        if (typeof chrome !== 'undefined' && chrome.storage) {
-            chrome.storage.local.get(['sharedState'], (result) => {
+        if (browser && browser.storage) {
+            browser.storage.local.get(['sharedState'], (result) => {
                 const sharedState = result.sharedState || {};
                 sharedState.selectedTabs = selectedTabs;
-                chrome.storage.local.set({ sharedState });
+                browser.storage.local.set({ sharedState });
             });
         }
     }
@@ -611,9 +538,9 @@ window.addEventListener('message', async (event) => {
     // Handle tab requests from overlay
     if (event.data.type === 'SPEEDY_REQUEST_TABS') {
         // Request tabs from background script
-        if (typeof chrome !== 'undefined' && chrome.runtime) {
+        if (browser && browser.runtime) {
             try {
-                const response = await chrome.runtime.sendMessage({
+                const response = await browser.runtime.sendMessage({
                     type: 'GET_ALL_TABS'
                 });
                 
@@ -629,29 +556,154 @@ window.addEventListener('message', async (event) => {
             }
         }
     }
+    
+    // Handle API requests from overlay
+    if (event.data.type === 'SPEEDY_API_REQUEST') {
+        const { requestId, method, endpoint, body } = event.data;
+        
+        // Log chat requests with AI message details
+        if (endpoint.includes('/chat') && body) {
+            console.log("💬 [SPEEDY] Sending message to AI");
+            console.log("🤖 Model:", body.model);
+            
+            if (body.messages && Array.isArray(body.messages)) {
+                body.messages.forEach((msg, index) => {
+                    if (msg.role === 'user' && msg.content) {
+                        console.log(`\n📨 User message (${msg.content.length} chars):`);
+                        console.log(msg.content);
+                        console.log("\n");
+                    }
+                });
+            }
+        }
+        
+        if (browser && browser.runtime) {
+            try {
+                const response = await browser.runtime.sendMessage({
+                    type: 'API_REQUEST',
+                    method,
+                    endpoint,
+                    body
+                });
+                
+                if (response.error) {
+                    console.log("❌ [SPEEDY] Error:", response.error);
+                }
+                
+                // Send response back to overlay
+                window.postMessage({
+                    type: 'SPEEDY_API_RESPONSE',
+                    requestId,
+                    success: response.success,
+                    data: response.data,
+                    error: response.error
+                }, '*');
+            } catch (err) {
+                console.error("❌ [SPEEDY] API request failed:", err);
+                // Send error back to overlay
+                window.postMessage({
+                    type: 'SPEEDY_API_RESPONSE',
+                    requestId,
+                    success: false,
+                    error: err.message || 'API request failed'
+                }, '*');
+            }
+        }
+    }
+    
+    // Handle screenshot capture requests from overlay
+    if (event.data.type === 'SPEEDY_CAPTURE_SCREENSHOT') {
+        const { requestId } = event.data;
+        
+        if (browser && browser.runtime) {
+            try {
+                const response = await browser.runtime.sendMessage({
+                    type: 'CAPTURE_SCREENSHOT'
+                });
+                
+                // Send response back to overlay
+                window.postMessage({
+                    type: 'SPEEDY_SCREENSHOT_RESPONSE',
+                    requestId,
+                    success: response.success,
+                    dataUrl: response.dataUrl,
+                    error: response.error
+                }, '*');
+            } catch (err) {
+                // Send error back to overlay
+                window.postMessage({
+                    type: 'SPEEDY_SCREENSHOT_RESPONSE',
+                    requestId,
+                    success: false,
+                    error: err.message || 'Screenshot capture failed'
+                }, '*');
+            }
+        }
+    }
+    
+    // Handle tab content extraction requests from overlay
+    if (event.data.type === 'SPEEDY_EXTRACT_TAB_CONTENT') {
+        const { requestId, tabId } = event.data;
+        
+        if (browser && browser.runtime) {
+            try {
+                const response = await browser.runtime.sendMessage({
+                    type: 'EXTRACT_TAB_CONTENT',
+                    tabId: tabId
+                });
+                
+                // Send response back to overlay
+                window.postMessage({
+                    type: 'SPEEDY_EXTRACT_RESPONSE',
+                    requestId,
+                    success: response.success,
+                    content: response.content,
+                    error: response.error
+                }, '*');
+            } catch (err) {
+                console.error("❌ [SPEEDY] Tab content extraction failed:", err);
+                // Send error back to overlay
+                window.postMessage({
+                    type: 'SPEEDY_EXTRACT_RESPONSE',
+                    requestId,
+                    success: false,
+                    error: err.message || 'Content extraction failed'
+                }, '*');
+            }
+        }
+    }
 });
 
 // =======================
 // INITIALIZATION
 // =======================
 
-// Initialize the content script
-function initialize() {
-    console.log("🚀 Speedy AI Content Script loaded");
-    
-    // Set up message handlers
-    setupMessageHandlers();
-    
-    // Inject overlay
-    injectOverlay();
-}
+// Check if already initialized to prevent multiple injections
+if (typeof window.__speedyAiInitialized === 'undefined') {
+    window.__speedyAiInitialized = true;
 
-// Auto-initialize if running as a content script
-if (typeof document !== 'undefined' && document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initialize);
-} else if (typeof document !== 'undefined') {
-    initialize();
+    // Initialize the content script
+    function initialize() {
+        console.log("🚀 Speedy AI Content Script loaded");
+        
+        // Set up message handlers
+        setupMessageHandlers();
+        
+        // Inject overlay
+        injectOverlay();
+    }
+
+    // Auto-initialize if running as a content script
+    if (typeof document !== 'undefined' && document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else if (typeof document !== 'undefined') {
+        initialize();
+    }
+} else {
+    console.log("⏭️ Speedy AI Content Script already initialized, skipping");
 }
 
 // Functions are available globally in the content script context
 // No exports needed for Chrome extension content scripts
+
+} // End of guard clause

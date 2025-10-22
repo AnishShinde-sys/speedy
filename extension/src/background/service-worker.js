@@ -1,50 +1,89 @@
 // Background service worker for Speedy AI Assistant
 
+// Browser compatibility layer - use self.browser if available (Firefox with polyfill), else chrome
+// Use self to access global scope in both service workers and background pages
+var browser = (typeof self.browser !== 'undefined') ? self.browser : chrome;
+
 // Handle keyboard shortcuts
-chrome.commands.onCommand.addListener(async (command) => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+browser.commands.onCommand.addListener(async (command) => {
+  console.log('⌨️ [Background] Keyboard command received:', command);
   
-  if (command === 'toggle-overlay') {
-    // Cmd+K - Toggle overlay for quick input and chat
-    if (tab) {
-      await toggleOverlay(tab);
+  try {
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs && tabs.length > 0 ? tabs[0] : null;
+    
+    if (command === 'toggle-overlay') {
+      console.log('🎯 [Background] Toggle overlay command, tab:', tab?.id, tab?.url);
+      // Cmd+Option+A - Toggle overlay for quick input and chat
+      if (tab) {
+        await toggleOverlay(tab);
+      } else {
+        console.error('❌ [Background] No active tab found');
+      }
     }
+  } catch (error) {
+    console.error('❌ [Background] Error handling command:', error);
   }
 });
 
-// Handle extension icon click
-chrome.action.onClicked.addListener(async (tab) => {
-  // Toggle overlay when clicking the icon
-  await toggleOverlay(tab);
-});
+// Handle extension icon click (Chrome MV3 uses action, Firefox MV2 uses browserAction)
+if (browser.action && browser.action.onClicked) {
+  browser.action.onClicked.addListener(async (tab) => {
+    // Toggle overlay when clicking the icon
+    await toggleOverlay(tab);
+  });
+} else if (browser.browserAction && browser.browserAction.onClicked) {
+  browser.browserAction.onClicked.addListener(async (tab) => {
+    // Toggle overlay when clicking the icon (Firefox)
+    await toggleOverlay(tab);
+  });
+}
 
 // Toggle overlay function with content script injection fallback
 async function toggleOverlay(tab) {
-  // Don't try to inject on chrome:// or other restricted pages
-  if (tab.url?.startsWith('chrome://') || tab.url?.startsWith('chrome-extension://')) {
-    console.log('Cannot inject content script on restricted page:', tab.url);
+  if (!tab || !tab.id) {
+    console.error('❌ [Background] Invalid tab object');
     return;
   }
   
+  // Don't try to inject on chrome:// or other restricted pages
+  const url = tab.url || '';
+  if (url.startsWith('chrome://') || 
+      url.startsWith('chrome-extension://') ||
+      url.startsWith('about:')) {
+    console.log('Cannot inject content script on restricted page:', url);
+    return;
+  }
+  
+  console.log('🎯 [Background] Toggling overlay for tab:', tab.id, url);
+  
   try {
     // Try to send message to existing content script
-    await chrome.tabs.sendMessage(tab.id, { type: 'toggle_overlay' });
+    await browser.tabs.sendMessage(tab.id, { type: 'toggle_overlay' });
   } catch (error) {
     // Content script not loaded, try to inject it
     console.log('Content script not found, injecting...');
     
     try {
-      // Inject content script
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ['content/content-script.js']
-      });
+      // Inject content script (MV3 for Chrome, MV2 for Firefox)
+      if (browser.scripting && browser.scripting.executeScript) {
+        // Chrome MV3 way
+        await browser.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content/content-script.js']
+        });
+      } else {
+        // Firefox MV2 way
+        await browser.tabs.executeScript(tab.id, {
+          file: 'content/content-script.js'
+        });
+      }
       
       // Wait a bit for the script to initialize
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Try sending message again
-      await chrome.tabs.sendMessage(tab.id, { type: 'toggle_overlay' });
+      await browser.tabs.sendMessage(tab.id, { type: 'toggle_overlay' });
     } catch (injectError) {
       console.error('Failed to inject content script:', injectError);
     }
@@ -52,7 +91,7 @@ async function toggleOverlay(tab) {
 }
 
 // Handle messages from content scripts
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   handleMessage(message, sender, sendResponse);
   return true; // Keep message channel open for async response
 });
@@ -88,6 +127,10 @@ async function handleMessage(message, sender, sendResponse) {
         await handleCaptureScreenshot(sender.tab, sendResponse);
         break;
         
+      case 'API_REQUEST':
+        await handleApiRequest(message, sendResponse);
+        break;
+        
       default:
         console.warn('⚠️ [Background] Unknown message type:', message.type);
         sendResponse({ success: false, error: 'Unknown message type' });
@@ -101,7 +144,8 @@ async function handleMessage(message, sender, sendResponse) {
 // Get current active tab
 async function handleGetCurrentTab(sendResponse) {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs && tabs.length > 0 ? tabs[0] : null;
     
     if (tab) {
       sendResponse({
@@ -164,7 +208,15 @@ async function getFaviconAsDataUrl(faviconUrl) {
 
 async function handleGetAllTabs(sendResponse) {
   try {
-    const tabs = await chrome.tabs.query({});
+    // Get the current active tab in the current window first
+    const currentTabs = await browser.tabs.query({ active: true, currentWindow: true });
+    const currentTab = currentTabs && currentTabs.length > 0 ? currentTabs[0] : null;
+    const currentTabId = currentTab?.id;
+    
+    console.log('🎯 [Background] Current active tab ID:', currentTabId, 'Title:', currentTab?.title);
+    
+    // Get all tabs
+    const tabs = await browser.tabs.query({});
     
     // Convert favicons to data URLs to bypass CSP
     const tabList = await Promise.all(tabs.map(async tab => {
@@ -186,12 +238,17 @@ async function handleGetAllTabs(sendResponse) {
         }
       }
       
+      const isActive = tab.id === currentTabId;
+      if (isActive) {
+        console.log('✅ [Background] Marking tab as active:', tab.title);
+      }
+      
       return {
         id: tab.id,
         title: tab.title,
         url: tab.url,
         favIconUrl: faviconDataUrl || tab.favIconUrl, // Use data URL or original
-        active: tab.active
+        active: isActive // Mark only the CURRENT window's active tab as active
       };
     }));
     
@@ -205,10 +262,12 @@ async function handleGetAllTabs(sendResponse) {
 async function handleExtractTabContent(tabId, sendResponse) {
   try {
     // Send message to content script to extract content
-    const response = await chrome.tabs.sendMessage(tabId, { type: 'get_page_content' });
+    const response = await browser.tabs.sendMessage(tabId, { type: 'get_page_content' });
     
     if (response && response.success) {
-      sendResponse({ success: true, content: response.context });
+      // Extract just the content string from the context object
+      const contentString = response.context?.content || '';
+      sendResponse({ success: true, content: contentString });
     } else {
       sendResponse({ success: false, error: 'Failed to extract content' });
     }
@@ -221,7 +280,7 @@ async function handleExtractTabContent(tabId, sendResponse) {
 // Get selected text from tab
 async function handleGetSelectedText(tabId, sendResponse) {
   try {
-    const response = await chrome.tabs.sendMessage(tabId, { type: 'get_selected_text' });
+    const response = await browser.tabs.sendMessage(tabId, { type: 'get_selected_text' });
     
     if (response && response.success) {
       sendResponse({ success: true, text: response.text });
@@ -242,7 +301,7 @@ async function handleCaptureScreenshot(tab, sendResponse) {
     }
     
     // Capture the visible tab
-    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+    const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
       format: 'png',
       quality: 100
     });
@@ -257,40 +316,141 @@ async function handleCaptureScreenshot(tab, sendResponse) {
 // Extract content from a tab
 async function extractTabContent(tabId) {
   try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      func: () => {
-        // Extract page content
-        const title = document.title;
-        const url = window.location.href;
-        
-        // Get main content (remove scripts, styles, etc.)
-        const clone = document.body.cloneNode(true);
-        const scripts = clone.querySelectorAll('script, style, noscript');
-        scripts.forEach(el => el.remove());
-        
-        // Get text content
-        const text = clone.innerText || clone.textContent || '';
-        
-        // Clean up whitespace
-        const cleanText = text
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0)
-          .join('\n');
-        
-        return {
-          title,
-          url,
-          content: cleanText.substring(0, 10000) // Limit to 10k chars
-        };
-      }
-    });
-    
-    return results[0]?.result || null;
+    // Check if we have MV3 scripting API (Chrome) or need to use MV2 (Firefox)
+    if (browser.scripting && browser.scripting.executeScript) {
+      // Chrome Manifest V3
+      const results = await browser.scripting.executeScript({
+        target: { tabId: tabId },
+        func: () => {
+          // Extract page content
+          const title = document.title;
+          const url = window.location.href;
+          
+          // Get main content (remove scripts, styles, etc.)
+          const clone = document.body.cloneNode(true);
+          const scripts = clone.querySelectorAll('script, style, noscript');
+          scripts.forEach(el => el.remove());
+          
+          // Get text content
+          const text = clone.innerText || clone.textContent || '';
+          
+          // Clean up whitespace
+          const cleanText = text
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .join('\n');
+          
+          return {
+            title,
+            url,
+            content: cleanText.substring(0, 10000) // Limit to 10k chars
+          };
+        }
+      });
+      return results[0]?.result || null;
+    } else {
+      // Firefox MV2
+      const results = await browser.tabs.executeScript(tabId, {
+        code: `
+          (() => {
+            const title = document.title;
+            const url = window.location.href;
+            
+            const clone = document.body.cloneNode(true);
+            const scripts = clone.querySelectorAll('script, style, noscript');
+            scripts.forEach(el => el.remove());
+            
+            const text = clone.innerText || clone.textContent || '';
+            
+            const cleanText = text
+              .split('\\n')
+              .map(line => line.trim())
+              .filter(line => line.length > 0)
+              .join('\\n');
+            
+            return {
+              title,
+              url,
+              content: cleanText.substring(0, 10000)
+            };
+          })()
+        `
+      });
+      return results[0] || null;
+    }
   } catch (error) {
     console.error(`[Background] Error extracting content from tab ${tabId}:`, error);
     return null;
+  }
+}
+
+// Handle API requests (proxy to avoid CSP issues)
+async function handleApiRequest(message, sendResponse) {
+  const { method, endpoint, body } = message;
+  const API_BASE_URL = 'http://localhost:3001';
+  
+  try {
+    console.log(`🌐 [Background] API ${method} ${endpoint}`);
+    
+    const fetchOptions = {
+      method: method || 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    };
+    
+    if (body) {
+      fetchOptions.body = JSON.stringify(body);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, fetchOptions);
+    
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    sendResponse({ success: true, data });
+  } catch (error) {
+    console.error('❌ [Background] API request failed:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Handle streaming API requests
+async function handleStreamingApiRequest(message, sendCallback) {
+  const { method, endpoint, body } = message;
+  const API_BASE_URL = 'http://localhost:3001';
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: method || 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+    
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value);
+      sendCallback({ type: 'chunk', data: chunk });
+    }
+    
+    sendCallback({ type: 'done' });
+  } catch (error) {
+    console.error('❌ [Background] Streaming API request failed:', error);
+    sendCallback({ type: 'error', error: error.message });
   }
 }
 

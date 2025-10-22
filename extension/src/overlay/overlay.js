@@ -2,6 +2,46 @@
 (function() {
   'use strict';
 
+  // Helper function to make API requests through content script -> background script
+  // This avoids CSP issues on strict pages like openrouter.ai
+  // The overlay runs in page context, so we use window.postMessage to talk to content script
+  async function apiRequest(method, endpoint, body = null) {
+    return new Promise((resolve, reject) => {
+      const requestId = `api_${Date.now()}_${Math.random()}`;
+      
+      // Listen for response
+      const messageHandler = (event) => {
+        if (event.source !== window) return;
+        if (event.data.type === 'SPEEDY_API_RESPONSE' && event.data.requestId === requestId) {
+          window.removeEventListener('message', messageHandler);
+          
+          if (event.data.success) {
+            resolve(event.data.data);
+          } else {
+            reject(new Error(event.data.error || 'API request failed'));
+          }
+        }
+      };
+      
+      window.addEventListener('message', messageHandler);
+      
+      // Send request to content script
+      window.postMessage({
+        type: 'SPEEDY_API_REQUEST',
+        requestId,
+        method,
+        endpoint,
+        body
+      }, '*');
+      
+      // Timeout after 30 seconds
+      setTimeout(() => {
+        window.removeEventListener('message', messageHandler);
+        reject(new Error('API request timeout'));
+      }, 30000);
+    });
+  }
+
   // Create the overlay HTML
   function createOverlay() {
     const overlayHTML = `
@@ -14,23 +54,7 @@
         
         #speedy-tab-menu::-webkit-scrollbar,
         #speedy-model-menu::-webkit-scrollbar {
-          width: 8px;
-        }
-        
-        #speedy-tab-menu::-webkit-scrollbar-track,
-        #speedy-model-menu::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        
-        #speedy-tab-menu::-webkit-scrollbar-thumb,
-        #speedy-model-menu::-webkit-scrollbar-thumb {
-          background: rgba(0, 0, 0, 0.15);
-          border-radius: 4px;
-        }
-        
-        #speedy-tab-menu::-webkit-scrollbar-thumb:hover,
-        #speedy-model-menu::-webkit-scrollbar-thumb:hover {
-          background: rgba(0, 0, 0, 0.25);
+          display: none;
         }
         
         .no-scrollbar::-webkit-scrollbar {
@@ -48,17 +72,8 @@
         }
         
         /* Message styles */
-        #speedy-messages-container::-webkit-scrollbar {
-          width: 6px;
-        }
-        
-        #speedy-messages-container::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        
-        #speedy-messages-container::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.2);
-          border-radius: 4px;
+        #speedy-messages-list::-webkit-scrollbar {
+          display: none;
         }
         
         .speedy-message-wrapper {
@@ -157,9 +172,9 @@
         left: 50%;
         transform: translateX(-50%) translateY(20px);
         z-index: 999999;
-        width: 500px;
+        width: 600px;
         max-width: 90vw;
-        max-height: 80vh;
+        max-height: 60vh;
         display: flex;
         flex-direction: column;
         transition: opacity 0.3s ease-out, transform 0.3s ease-out;
@@ -174,44 +189,34 @@
           border-radius: 6px;
           border: 1px solid rgba(255, 255, 255, 0.18);
           box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
-          padding: 10px;
+          padding: 10px 0px;
           display: flex;
           flex-direction: column;
-          max-height: 80vh;
+          max-height: 60vh;
           transition: box-shadow 100ms ease-in-out, border-color 100ms ease-in-out, backdrop-filter 200ms ease-in-out;
           position: relative;
         ">
-          <!-- Chat Messages Container -->
-          <div id="speedy-messages-container" style="
+          <!-- Chat Messages List -->
+          <div id="speedy-messages-list" style="
             display: none;
             flex-direction: column;
             overflow-y: auto;
-            margin-bottom: 12px;
-            background: rgba(11, 12, 16, 0.95);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border-radius: 16px;
-            padding: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            max-height: 500px;
-          ">
-            <div id="speedy-messages-list" style="
-              display: flex;
-              flex-direction: column;
-              width: 100%;
-              gap: 8px;
-            "></div>
-          </div>
+            margin: 0px 10px 12px 10px;
+            padding: 20px 20px 16px 20px;
+            height: 250px;
+            width: 100%;
+            gap: 8px;
+            position: relative;
+          "></div>
           
           <!-- Context Pills Row -->
           <div style="
             align-items: center;
               display: flex;
-              gap: 4px;
+              gap: 2px;
             width: 100%;
             flex-wrap: wrap;
-            margin-bottom: 4px;
+            margin: 1px 10px 3px 10px;
           ">
             <!-- @ Button (Fixed Position) -->
             <div tabindex="0" id="speedy-at-button" style="
@@ -219,13 +224,13 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-              padding: 0 6px;
-              height: 26px;
-              min-height: 26px;
-              max-height: 26px;
+              padding: 0 5px;
+              height: 22px;
+              min-height: 22px;
+              max-height: 22px;
               width: auto;
               box-sizing: border-box;
-              border-radius: 6px;
+              border-radius: 5px;
               border: 1px solid rgba(228, 228, 228, 0.11);
               outline: none;
               flex-shrink: 0;
@@ -235,10 +240,10 @@
               transition-timing-function: ease;
               user-select: none;
               font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-              font-size: 13px;
+              font-size: 11px;
               color: rgba(228, 228, 228, 0.55);
             ">
-              <span style="font-size: 13px; color: rgba(228, 228, 228, 0.55); line-height: 26px;">@</span>
+              <span style="font-size: 11px; color: rgba(228, 228, 228, 0.55); line-height: 22px;">@</span>
             </div>
             
             <!-- Context Pills Container -->
@@ -293,6 +298,7 @@
             padding-top: 0px;
             cursor: text;
             gap: 0px;
+            margin: 0px 10px;
           ">
             <div style="
               height: auto;
@@ -322,7 +328,7 @@
                      user-select: text;
                      white-space: pre-wrap;
                      min-height: 20px;
-                     max-height: 240px;
+                     max-height: 204px;
                      overflow-y: auto;
                    "
               ></div>
@@ -338,14 +344,14 @@
             flex-shrink: 0;
             cursor: auto;
             width: 100%;
-            margin-top: 16px;
+            margin: 16px 10px 0px 10px;
             height: 28px;
           ">
-            <!-- Left: Model Picker -->
+            <!-- Left: Model Picker + Upload/Screenshot Buttons -->
             <div style="
               display: flex;
                   align-items: center;
-                  gap: 4px;
+                  gap: 8px;
               margin-right: 6px;
               flex-shrink: 1;
               flex-grow: 0;
@@ -444,59 +450,10 @@
                   z-index: 1000;
                   min-width: 280px;
                 ">
-                  <div style="padding: 8px 8px 4px; font-size: 11px; color: rgba(0,0,0,0.6); font-weight: 600; letter-spacing: 0.3px; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-                    BASIC
-                  </div>
-                  <div id="speedy-basic-models"></div>
-                  
-                  <div style="padding: 8px 8px 4px; font-size: 11px; color: rgba(0,0,0,0.6); font-weight: 600; letter-spacing: 0.3px; margin-top: 4px; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-                    ADVANCED
-                  </div>
-                  <div id="speedy-advanced-models"></div>
-                  
-                  <div style="height: 1px; background: rgba(0,0,0,0.1); margin: 8px 4px;"></div>
-                  
-                  <div id="speedy-other-models-btn" style="
-                    padding: 5px 8px;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    border-radius: 8px;
-                    transition: background 0.1s;
-                  ">
-                    <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(0,0,0,0.85); font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-                      <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
-                        <path fill="currentColor" d="M4 8a1.333 1.333 0 1 1-2.667 0A1.333 1.333 0 0 1 4 8m5.333 0a1.333 1.333 0 1 1-2.666 0 1.333 1.333 0 0 1 2.666 0m4 1.333a1.333 1.333 0 1 0 0-2.666 1.333 1.333 0 0 0 0 2.666"/>
-                      </svg>
-                      Other models
-                    </div>
-                    <svg width="12" height="12" fill="none" viewBox="0 0 12 12">
-                      <path fill="currentColor" fill-rule="evenodd" d="M4.176 10.225a.6.6 0 0 0 .848 0l3.517-3.518a1 1 0 0 0 0-1.414L5.024 1.776a.6.6 0 1 0-.848.849L7.55 6 4.176 9.376a.6.6 0 0 0 0 .849" clip-rule="evenodd"/>
-                    </svg>
-                  </div>
-                  
-                  <div id="speedy-all-models-section" style="display: none;">
-                    <div style="position: sticky; top: 0; background: #fff; padding: 8px 0px; z-index: 1;">
-                      <input id="speedy-model-search" placeholder="Search all models…" style="
-                        width: 100%;
-                        box-sizing: border-box;
-                        padding: 8px 10px;
-                        font-size: 13px;
-                        font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                        border-radius: 8px;
-                        border: 1px solid rgba(0,0,0,0.12);
-                        outline: none;
-                      "/>
-                    </div>
-                    <div id="speedy-all-models"></div>
-                  </div>
+                  <div id="all-models"></div>
                   </div>
                 </div>
-              </div>
               
-            <!-- Right: Action Buttons -->
-            <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-end;">
               <!-- Image Upload Button -->
               <button type="button" id="speedy-image-upload" style="
                 width: 18px;
@@ -508,8 +465,9 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                  padding: 0;
+                padding: 0;
                 transition: opacity 0.1s;
+                flex-shrink: 0;
               " title="Upload image">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -522,8 +480,8 @@
               <button type="button" id="speedy-screenshot-capture" style="
                 width: 18px;
                 height: 18px;
-                  background: transparent;
-                  border: none;
+                background: transparent;
+                border: none;
                 color: rgba(255, 255, 255, 0.9);
                 cursor: pointer;
                 display: flex;
@@ -531,13 +489,17 @@
                 justify-content: center;
                 padding: 0;
                 transition: opacity 0.1s;
+                flex-shrink: 0;
               " title="Capture screen">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                   <circle cx="12" cy="13" r="4"/>
                 </svg>
               </button>
+              </div>
               
+            <!-- Right: Submit Button -->
+            <div style="display: flex; align-items: center; justify-content: flex-end;">
               <!-- Submit Button -->
               <button
                 id="speedy-submit"
@@ -579,8 +541,25 @@
       return;
     }
 
-    // Create shadow DOM for style isolation
-    const shadowRoot = container.attachShadow({ mode: 'open' });
+    // Check if shadow DOM already exists (prevent re-attachment error)
+    // Check if shadow root already exists
+    let shadowRoot = container.shadowRoot;
+    if (shadowRoot) {
+      console.log('♻️ [Overlay] Shadow DOM already exists, reusing it');
+      // Clear existing content to re-initialize
+      shadowRoot.innerHTML = '';
+    } else {
+      try {
+        // Create shadow DOM for style isolation
+        shadowRoot = container.attachShadow({ mode: 'open' });
+      } catch (error) {
+        console.error('❌ [Overlay] Failed to attach shadow DOM:', error);
+        // If attachment fails, element might already have shadow DOM in closed mode
+        // Try to remove and recreate the container
+        container.remove();
+        return;
+      }
+    }
     
     // Add the overlay HTML
     shadowRoot.innerHTML = createOverlay();
@@ -598,13 +577,7 @@
     const modelMenu = shadowRoot.getElementById('speedy-model-menu');
     const modelName = shadowRoot.getElementById('speedy-model-name');
     const modelChevron = shadowRoot.getElementById('speedy-model-chevron');
-    const modelSearch = shadowRoot.getElementById('speedy-model-search');
-    const basicModelsContainer = shadowRoot.getElementById('speedy-basic-models');
-    const advancedModelsContainer = shadowRoot.getElementById('speedy-advanced-models');
-    const otherModelsBtn = shadowRoot.getElementById('speedy-other-models-btn');
-    const allModelsContainer = shadowRoot.getElementById('speedy-all-models');
-    const allModelsSection = shadowRoot.getElementById('speedy-all-models-section');
-    const messagesContainer = shadowRoot.getElementById('speedy-messages-container');
+    const allModelsContainer = shadowRoot.getElementById('all-models');
     const messagesList = shadowRoot.getElementById('speedy-messages-list');
     const imageUploadBtn = shadowRoot.getElementById('speedy-image-upload');
     const screenshotBtn = shadowRoot.getElementById('speedy-screenshot-capture');
@@ -622,23 +595,25 @@
     let isStreaming = false;
     let capturedScreenshots = [];
     
-    // Basic models (fast, everyday use)
-    const basicModels = [
-      'anthropic/claude-3-haiku',
+    // Fallback models list (main models only)
+    const fallbackModels = [
+      'openai/gpt-4o',
       'openai/gpt-3.5-turbo',
-      'google/gemini-flash'
-    ];
-    
-    // Advanced models (powerful, complex tasks)
-    const advancedModels = [
       'anthropic/claude-3.5-sonnet',
-      'openai/gpt-4-turbo',
-      'google/gemini-pro'
+      'anthropic/claude-3-haiku',
+      'google/gemini-pro',
+      'google/gemini-flash'
     ];
     
     // Placeholder handling for contenteditable
     function updatePlaceholder() {
       const placeholder = input.getAttribute('data-placeholder');
+      
+      // Clean up empty input - remove any <br> tags if text is empty
+      if (input.textContent.trim() === '') {
+        input.innerHTML = '';
+      }
+      
       if (input.textContent.trim() === '') {
         input.style.setProperty('--placeholder-visible', 'block');
         if (!input.hasAttribute('data-placeholder-added')) {
@@ -663,17 +638,50 @@
     // Fetch available models
     async function fetchModels() {
       try {
-        const response = await fetch('http://localhost:3001/api/openrouter/models');
-        const data = await response.json();
+        const data = await apiRequest('GET', '/api/openrouter/models');
         
-        if (data.data) {
-          availableModels = data.data;
+        if (data.data && Array.isArray(data.data)) {
+          // Filter to only include main models from big 4 providers
+          const mainModels = [
+            // OpenAI - main models only
+            'openai/gpt-4o',
+            'openai/gpt-4o-mini',
+            'openai/gpt-4-turbo',
+            'openai/gpt-3.5-turbo',
+            'openai/o1-mini',
+            
+            // Anthropic - main Claude models
+            'anthropic/claude-3.5-sonnet',
+            'anthropic/claude-3.5-haiku',
+            'anthropic/claude-3-opus',
+            'anthropic/claude-3-haiku',
+            
+            // Google - main Gemini models
+            'google/gemini-2.5-flash',
+            'google/gemini-pro',
+            'google/gemini-flash',
+            
+            // X.AI - main Grok models
+            'x-ai/grok-4',
+            'x-ai/grok-4-fast'
+          ];
+          
+          const filteredModels = data.data.filter(model => {
+            return mainModels.includes(model.id);
+          });
+          
+          // Sort models alphabetically by name within each provider
+          availableModels = filteredModels.sort((a, b) => {
+            const nameA = (a.name || a.id).toLowerCase();
+            const nameB = (b.name || b.id).toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
         }
       } catch (error) {
         console.error('Error fetching models:', error);
-        availableModels = popularModels.map(id => ({ 
+        availableModels = fallbackModels.map(id => ({ 
           id, 
-          name: id.split('/')[1] 
+          name: id.split('/').pop()
         }));
       } finally {
         modelsLoading = false;
@@ -718,57 +726,14 @@
     }
     
     // Render models in dropdown
-    function renderModels(searchQuery = '') {
-      // If searching, show all models section
-      if (searchQuery) {
-        allModelsSection.style.display = 'block';
-        otherModelsBtn.style.display = 'none';
-        basicModelsContainer.parentElement.style.display = 'none';
-        advancedModelsContainer.parentElement.style.display = 'none';
-        
+    function renderModels() {
       allModelsContainer.innerHTML = '';
-        const query = searchQuery.toLowerCase();
-        
-        const filteredModels = availableModels.filter(m => {
-          const name = m.name || m.id;
-          return name.toLowerCase().includes(query) || m.id.toLowerCase().includes(query);
-        }).slice(0, 30);
-        
-        filteredModels.forEach(model => {
-          const modelButton = createModelButton(model);
-          allModelsContainer.appendChild(modelButton);
-        });
-        return;
-      }
       
-      // Default view: show basic/advanced sections
-      allModelsSection.style.display = 'none';
-      otherModelsBtn.style.display = 'flex';
-      basicModelsContainer.parentElement.style.display = 'block';
-      advancedModelsContainer.parentElement.style.display = 'block';
-      
-      basicModelsContainer.innerHTML = '';
-      advancedModelsContainer.innerHTML = '';
-      
-      // Render basic models
-      basicModels.forEach(modelId => {
-        const model = availableModels.find(m => m.id === modelId) || { 
-          id: modelId, 
-          name: modelId.split('/').pop() 
-        };
+      // Simply render all available models in order
+      availableModels.forEach(model => {
         const modelButton = createModelButton(model);
-        basicModelsContainer.appendChild(modelButton);
+        allModelsContainer.appendChild(modelButton);
       });
-      
-      // Render advanced models
-      advancedModels.forEach(modelId => {
-        const model = availableModels.find(m => m.id === modelId) || { 
-          id: modelId, 
-          name: modelId.split('/').pop() 
-        };
-          const modelButton = createModelButton(model);
-        advancedModelsContainer.appendChild(modelButton);
-        });
     }
     
     // Create model button
@@ -776,6 +741,15 @@
       const button = document.createElement('button');
       button.type = 'button';
       const isSelected = selectedModel === model.id;
+      
+      // Get clean model name without provider prefix
+      let displayName = model.name || model.id.split('/').pop();
+      
+      // Clean up the display name to be more readable
+      displayName = displayName
+        .replace(/^(gpt-|claude-|gemini-|grok-)/i, '')
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, l => l.toUpperCase());
       
       button.style.cssText = `
         width: 100%;
@@ -789,12 +763,10 @@
         color: ${isSelected ? 'rgb(37, 99, 235)' : 'rgb(55, 65, 81)'};
         cursor: pointer;
         transition: background 0.1s;
+        font-weight: ${isSelected ? '600' : '500'};
       `;
       
-      button.innerHTML = `
-        <div style="font-weight: ${isSelected ? '600' : '500'};">${model.name || model.id.split('/').pop()}</div>
-        <div style="font-size: 11px; color: ${isSelected ? 'rgb(59, 130, 246)' : 'rgb(156, 163, 175)'}; margin-top: 2px;">${model.id}</div>
-      `;
+      button.textContent = displayName;
       
       button.addEventListener('mouseenter', () => {
         if (!isSelected) {
@@ -811,7 +783,7 @@
       button.addEventListener('click', () => {
         selectedModel = model.id;
         updateModelDisplay();
-        renderModels(modelSearch.value);
+        renderModels();
         closeModelMenu();
       });
       
@@ -828,7 +800,6 @@
       modelMenu.style.display = 'block';
       modelChevron.style.transform = 'rotate(180deg)';
       modelSelector.style.background = 'rgba(255, 255, 255, 0.05)';
-      setTimeout(() => modelSearch.focus(), 50);
     }
     
     // ========== CHAT FUNCTIONS ==========
@@ -837,15 +808,10 @@
       if (currentChatId) return currentChatId;
       
       try {
-        const response = await fetch('http://localhost:3001/api/chats', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: 'Overlay Chat',
-            model: selectedModel
-          })
+        const chat = await apiRequest('POST', '/api/chats', {
+          title: 'Overlay Chat',
+          model: selectedModel
         });
-        const chat = await response.json();
         currentChatId = chat._id;
         return currentChatId;
       } catch (error) {
@@ -855,9 +821,8 @@
     }
     
     function addMessageToUI(role, content, isStreaming = false) {
-      if (messagesContainer.style.display === 'none') {
-        messagesContainer.style.display = 'flex';
-      }
+      // Always show the messages list when adding messages
+      messagesList.style.display = 'flex';
       
       const wrapper = document.createElement('div');
       wrapper.className = `speedy-message-wrapper ${role}`;
@@ -916,7 +881,7 @@
     }
     
     function scrollToBottom() {
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      messagesList.scrollTop = messagesList.scrollHeight;
     }
     
     async function sendMessageToAPI(messageText, contexts = []) {
@@ -928,18 +893,13 @@
       
       addMessageToUI('user', messageText);
       
-      await fetch(`http://localhost:3001/api/chats/${chatId}/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          role: 'user',
-          content: messageText,
-          context: contexts
-        })
+      await apiRequest('POST', `/api/chats/${chatId}/message`, {
+        role: 'user',
+        content: messageText,
+        context: contexts
       });
       
-      const chatResponse = await fetch(`http://localhost:3001/api/chats/${chatId}`);
-      const chatData = await chatResponse.json();
+      const chatData = await apiRequest('GET', `/api/chats/${chatId}`);
       
       const apiMessages = chatData.messages.map(msg => ({
         role: msg.role,
@@ -951,53 +911,25 @@
       let fullResponse = '';
       
       try {
-        const response = await fetch('http://localhost:3001/api/openrouter/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: apiMessages,
-            model: selectedModel,
-            stream: true
-          })
+        // Get the full response from API
+        const response = await apiRequest('POST', '/api/openrouter/chat', {
+          messages: apiMessages,
+          model: selectedModel,
+          stream: false
         });
         
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        // Extract the response content
+        if (response.choices && response.choices[0] && response.choices[0].message) {
+          fullResponse = response.choices[0].message.content;
           
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') break;
-              
-              try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices?.[0]?.delta?.content || '';
-                if (content) {
-                  fullResponse += content;
-                  updateStreamingMessage(streamingMessageDiv, fullResponse);
-                }
-              } catch (e) {
-                // Skip invalid JSON
-              }
-            }
-          }
+          // Simulate streaming by showing text gradually with auto-scroll
+          await simulateStreamingText(streamingMessageDiv, fullResponse);
         }
         
-        await fetch(`http://localhost:3001/api/chats/${chatId}/message`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            role: 'assistant',
-            content: fullResponse,
-            context: []
-          })
+        await apiRequest('POST', `/api/chats/${chatId}/message`, {
+          role: 'assistant',
+          content: fullResponse,
+          context: []
         });
         
         streamingMessageDiv.classList.remove('speedy-message-streaming');
@@ -1007,6 +939,23 @@
         streamingMessageDiv.textContent = 'Error: Failed to get response';
       } finally {
         isStreaming = false;
+      }
+    }
+    
+    // Simulate streaming text effect with auto-scroll
+    async function simulateStreamingText(messageDiv, fullText) {
+      const words = fullText.split(' ');
+      let displayedText = '';
+      
+      for (let i = 0; i < words.length; i++) {
+        displayedText += (i > 0 ? ' ' : '') + words[i];
+        updateStreamingMessage(messageDiv, displayedText);
+        
+        // Auto-scroll as text appears - keep user following the text
+        scrollToBottom();
+        
+        // Delay between words for streaming effect (30ms = smooth but fast)
+        await new Promise(resolve => setTimeout(resolve, 30));
       }
     }
     
@@ -1062,24 +1011,30 @@
       }, '*');
     }
     
-    function addContextChip(tab) {
+    function addContextChip(tab, addFirst = false) {
       console.log('🔍 [Overlay] addContextChip called with tab:', {
         id: tab.id,
         title: tab.title,
         url: tab.url,
         hasFavIcon: !!tab.favIconUrl,
-        favIconUrl: tab.favIconUrl
+        favIconUrl: tab.favIconUrl,
+        addFirst: addFirst
       });
       
       if (selectedTabs.find(t => t.id === tab.id)) return;
       
-      selectedTabs.push(tab);
+      // Add current tab first, others at the end
+      if (addFirst) {
+        selectedTabs.unshift(tab);
+      } else {
+        selectedTabs.push(tab);
+      }
       
       // Create wrapper div (like Cursor's structure)
       const wrapper = document.createElement('div');
       wrapper.style.cssText = `
         display: inline-flex;
-        gap: 4px;
+        gap: 3px;
         align-items: center;
       `;
       
@@ -1114,22 +1069,22 @@
         opacity: 1;
         display: flex;
         align-items: center;
-        gap: 4px;
-        padding: 0 8px;
-        border-radius: 6px;
-        background: transparent;
+        gap: 3px;
+        padding: 0 7px;
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.15);
         font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        font-size: 13px;
-        line-height: 26px;
+        font-size: 11px;
+        line-height: 22px;
         color: rgba(228, 228, 228, 0.55);
         user-select: none;
         text-overflow: ellipsis;
         white-space: nowrap;
         overflow: visible;
         box-sizing: border-box;
-        height: 26px;
-        min-height: 26px;
-        max-height: 26px;
+        height: 22px;
+        min-height: 22px;
+        max-height: 22px;
       `;
       
       // Truncate title to 10-12 characters max
@@ -1142,14 +1097,14 @@
       console.log(`✅ [Overlay] Context chip favicon for tab ${tab.id}:`, favicon.substring(0, 50) + '...');
        
        chip.innerHTML = `
-        <div style="width: 16px; margin-left: -4px; margin-right: -2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-          <img src="${favicon}" style="width: 13px; height: 13px; border-radius: 2px; object-fit: contain;" />
+        <div style="width: 14px; margin-left: -3px; margin-right: -2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <img src="${favicon}" style="width: 11px; height: 11px; border-radius: 2px; object-fit: contain;" />
         </div>
-        <div style="flex-shrink: 0; opacity: 1; color: rgba(255, 255, 255, 0.9); font-size: 13px; line-height: 26px; display: flex; align-items: baseline;">
+        <div style="flex-shrink: 0; opacity: 1; color: rgba(255, 255, 255, 0.9); font-size: 11px; line-height: 22px; display: flex; align-items: baseline;">
           <span>${titleText}</span>${hasEllipsis ? '<span style="font-weight: 200; opacity: 0.7;">...</span>' : ''}
         </div>
          <button class="remove-chip" style="
-          margin-left: 4px;
+          margin-left: 3px;
            padding: 0;
            background: none;
            border: none;
@@ -1159,27 +1114,28 @@
            justify-content: center;
           opacity: 0.5;
           transition: opacity 0.1s;
-          width: 14px;
-          height: 14px;
+          width: 12px;
+          height: 12px;
           flex-shrink: 0;
           color: rgba(255, 255, 255, 0.9);
         ">
-          <svg width="10" height="10" viewBox="0 0 512 512" fill="currentColor" style="display: block;">
+          <svg width="9" height="9" viewBox="0 0 512 512" fill="currentColor" style="display: block;">
              <path d="m289.94 256 95-95A24 24 0 0 0 351 127l-95 95-95-95a24 24 0 0 0-34 34l95 95-95 95a24 24 0 1 0 34 34l95-95 95 95a24 24 0 0 0 34-34z"/>
            </svg>
          </button>
        `;
       
+      // Keep chips permanently highlighted - no hover effects
+      chip.style.background = 'rgba(255, 255, 255, 0.15)';
+      chip.style.opacity = '1';
+      
+      // Show remove button on hover only
       chip.addEventListener('mouseenter', () => {
-        chip.style.background = 'rgba(255, 255, 255, 0.2)';
-        chip.style.opacity = '1';
         const removeBtn = chip.querySelector('.remove-chip');
         if (removeBtn) removeBtn.style.opacity = '1';
       });
       
       chip.addEventListener('mouseleave', () => {
-        chip.style.background = 'rgba(255, 255, 255, 0.1)';
-        chip.style.opacity = '1';
         const removeBtn = chip.querySelector('.remove-chip');
         if (removeBtn) removeBtn.style.opacity = '0.5';
       });
@@ -1193,7 +1149,14 @@
       
       pillContainer.appendChild(chip);
       wrapper.appendChild(pillContainer);
-      contextPills.appendChild(wrapper);
+      
+      // Insert at beginning if addFirst is true (for current tab), otherwise append
+      if (addFirst && contextPills.firstChild) {
+        contextPills.insertBefore(wrapper, contextPills.firstChild);
+      } else {
+        contextPills.appendChild(wrapper);
+      }
+      
       syncContextToContentScript();
     }
     
@@ -1210,7 +1173,7 @@
       const wrapper = document.createElement('div');
       wrapper.style.cssText = `
         display: inline-flex;
-        gap: 4px;
+        gap: 3px;
         align-items: center;
       `;
       
@@ -1245,31 +1208,31 @@
         opacity: 1;
            display: flex;
            align-items: center;
-        gap: 4px;
-        padding: 0 8px;
-        border-radius: 6px;
-        background: transparent;
+        gap: 3px;
+        padding: 0 7px;
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.15);
         font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        font-size: 13px;
-        line-height: 26px;
+        font-size: 11px;
+        line-height: 22px;
         color: rgba(228, 228, 228, 0.55);
         user-select: none;
         text-overflow: ellipsis;
         white-space: nowrap;
         overflow: visible;
         box-sizing: border-box;
-        height: 26px;
-        min-height: 26px;
-        max-height: 26px;
+        height: 22px;
+        min-height: 22px;
+        max-height: 22px;
       `;
       
       chip.innerHTML = `
-        <div style="width: 16px; margin-left: -4px; margin-right: -2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-          <img src="${screenshot.thumbnail}" style="width: 13px; height: 13px; border-radius: 2px; object-fit: cover;" />
+        <div style="width: 14px; margin-left: -3px; margin-right: -2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <img src="${screenshot.thumbnail}" style="width: 11px; height: 11px; border-radius: 2px; object-fit: cover;" />
         </div>
-        <div style="flex-shrink: 0; opacity: 1; color: rgba(255, 255, 255, 0.9); font-size: 13px; line-height: 26px;">Screenshot</div>
+        <div style="flex-shrink: 0; opacity: 1; color: rgba(255, 255, 255, 0.9); font-size: 11px; line-height: 22px;">Screenshot</div>
         <button class="remove-chip" style="
-          margin-left: 4px;
+          margin-left: 3px;
           padding: 0;
           background: none;
           border: none;
@@ -1279,28 +1242,25 @@
           justify-content: center;
           opacity: 0.5;
           transition: opacity 0.1s;
-          width: 14px;
-          height: 14px;
+          width: 12px;
+          height: 12px;
           flex-shrink: 0;
           color: rgba(255, 255, 255, 0.9);
         ">
-          <svg width="10" height="10" viewBox="0 0 512 512" fill="currentColor" style="display: block;">
+          <svg width="9" height="9" viewBox="0 0 512 512" fill="currentColor" style="display: block;">
             <path d="m289.94 256 95-95A24 24 0 0 0 351 127l-95 95-95-95a24 24 0 0 0-34 34l95 95-95 95a24 24 0 1 0 34 34l95-95 95 95a24 24 0 0 0 34-34z"/>
           </svg>
         </button>
       `;
       
-      // Hover effects
+      // Keep chips permanently highlighted - no hover effects
+      // Only show remove button on hover
       chip.addEventListener('mouseenter', () => {
-        chip.style.background = 'rgba(255, 255, 255, 0.2)';
-        chip.style.opacity = '1';
         const removeBtn = chip.querySelector('.remove-chip');
         if (removeBtn) removeBtn.style.opacity = '1';
       });
       
       chip.addEventListener('mouseleave', () => {
-        chip.style.background = 'transparent';
-        chip.style.opacity = '1';
         const removeBtn = chip.querySelector('.remove-chip');
         if (removeBtn) removeBtn.style.opacity = '0.5';
       });
@@ -1495,46 +1455,6 @@
       }
     });
     
-    // Other models button handler
-    otherModelsBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      allModelsSection.style.display = 'block';
-      otherModelsBtn.style.display = 'none';
-      basicModelsContainer.parentElement.style.display = 'none';
-      advancedModelsContainer.parentElement.style.display = 'none';
-      
-      // Render all models
-      allModelsContainer.innerHTML = '';
-      const allOtherModels = availableModels
-        .filter(m => !basicModels.includes(m.id) && !advancedModels.includes(m.id))
-        .slice(0, 30);
-      
-      allOtherModels.forEach(model => {
-        const modelButton = createModelButton(model);
-        allModelsContainer.appendChild(modelButton);
-      });
-      
-      setTimeout(() => modelSearch.focus(), 50);
-    });
-    
-    otherModelsBtn.addEventListener('mouseenter', () => {
-      otherModelsBtn.style.background = 'rgba(0, 0, 0, 0.05)';
-    });
-    
-    otherModelsBtn.addEventListener('mouseleave', () => {
-      otherModelsBtn.style.background = 'transparent';
-    });
-    
-    // Model search handler
-    modelSearch.addEventListener('input', (e) => {
-      renderModels(e.target.value);
-    });
-    
-    modelSearch.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-    });
     
     // @ Button handler
     atButton.addEventListener('click', (e) => {
@@ -1554,6 +1474,7 @@
     
     // Input handlers
     input.addEventListener('input', (e) => {
+      updatePlaceholder();
       message = input.textContent;
       button.disabled = !message.trim();
       
@@ -1562,8 +1483,6 @@
       } else {
         button.style.color = 'rgba(255, 255, 255, 0.5)';
       }
-      
-      updatePlaceholder();
     });
     
     input.addEventListener('keydown', (e) => {
@@ -1616,34 +1535,48 @@
       e.stopPropagation();
       
       try {
-        // Send message to background script to capture screenshot
-        chrome.runtime.sendMessage({
-          type: 'CAPTURE_SCREENSHOT'
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            console.error('Screenshot capture error:', chrome.runtime.lastError);
-            showNotification('Screenshot capture failed');
-            return;
+        const requestId = `screenshot_${Date.now()}`;
+        
+        // Listen for response
+        const messageHandler = (event) => {
+          if (event.source !== window) return;
+          if (event.data.type === 'SPEEDY_SCREENSHOT_RESPONSE' && event.data.requestId === requestId) {
+            window.removeEventListener('message', messageHandler);
+            
+            if (event.data.success && event.data.dataUrl) {
+              // Add screenshot to captured list
+              const screenshot = {
+                id: `screenshot-${Date.now()}`,
+                dataUrl: event.data.dataUrl,
+                timestamp: new Date().toISOString(),
+                thumbnail: event.data.dataUrl // We'll use same for now
+              };
+              
+              capturedScreenshots.push(screenshot);
+              
+              // Add screenshot chip to context
+              addScreenshotChip(screenshot);
+              
+              // Show notification
+              showNotification('Screenshot captured!');
+            } else {
+              showNotification('Screenshot capture failed');
+            }
           }
-          
-          if (response && response.dataUrl) {
-            // Add screenshot to captured list
-            const screenshot = {
-              id: `screenshot-${Date.now()}`,
-              dataUrl: response.dataUrl,
-              timestamp: new Date().toISOString(),
-              thumbnail: response.dataUrl // We'll use same for now
-            };
-            
-            capturedScreenshots.push(screenshot);
-            
-            // Add screenshot chip to context
-            addScreenshotChip(screenshot);
-            
-            // Show notification
-            showNotification('Screenshot captured!');
-          }
-        });
+        };
+        
+        window.addEventListener('message', messageHandler);
+        
+        // Send request to content script
+        window.postMessage({
+          type: 'SPEEDY_CAPTURE_SCREENSHOT',
+          requestId
+        }, '*');
+        
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          window.removeEventListener('message', messageHandler);
+        }, 5000);
       } catch (error) {
         console.error('Screenshot failed:', error);
         showNotification('Screenshot capture failed');
@@ -1693,17 +1626,73 @@
       
       const messageToSend = message.trim();
       
-      // Build context from tabs
-      const contextsToSend = selectedTabs.map(tab => ({
-        type: 'tab',
-        data: {
-          id: tab.id,
-          title: tab.title,
-          url: tab.url,
-          content: '',
-          favIconUrl: tab.favIconUrl
+      // Build context from tabs - fetch actual content via background script
+      const contextsToSend = [];
+      
+      // Fetch content for each selected tab
+      for (const tab of selectedTabs) {
+        try {
+          // Request tab content extraction from background script
+          const contentResponse = new Promise((resolve, reject) => {
+            const requestId = `extract_${Date.now()}_${Math.random()}`;
+            
+            // Listen for response
+            const messageHandler = (event) => {
+              if (event.source !== window) return;
+              if (event.data.type === 'SPEEDY_EXTRACT_RESPONSE' && event.data.requestId === requestId) {
+                window.removeEventListener('message', messageHandler);
+                
+                if (event.data.success) {
+                  resolve(event.data.content);
+                } else {
+                  reject(new Error(event.data.error || 'Content extraction failed'));
+                }
+              }
+            };
+            
+            window.addEventListener('message', messageHandler);
+            
+            // Send request to content script
+            window.postMessage({
+              type: 'SPEEDY_EXTRACT_TAB_CONTENT',
+              requestId,
+              tabId: tab.id
+            }, '*');
+            
+            // Timeout after 5 seconds
+            setTimeout(() => {
+              window.removeEventListener('message', messageHandler);
+              reject(new Error('Content extraction timeout'));
+            }, 5000);
+          });
+          
+          const content = await contentResponse;
+          
+          contextsToSend.push({
+            type: 'tab',
+            data: {
+              id: tab.id,
+              title: tab.title,
+              url: tab.url,
+              content: content || '',
+              favIconUrl: tab.favIconUrl
+            }
+          });
+        } catch (error) {
+          console.error('Error fetching tab content:', error);
+          // Add tab without content if fetch fails
+          contextsToSend.push({
+            type: 'tab',
+            data: {
+              id: tab.id,
+              title: tab.title,
+              url: tab.url,
+              content: '',
+              favIconUrl: tab.favIconUrl
+            }
+          });
         }
-      }));
+      }
       
       // Add screenshots to context
       capturedScreenshots.forEach(screenshot => {
@@ -1720,12 +1709,11 @@
       message = '';
       input.textContent = '';
       button.disabled = true;
-            button.style.color = 'rgba(255, 255, 255, 0.5)';
+      button.style.color = 'rgba(255, 255, 255, 0.5)';
       updatePlaceholder();
       
-      selectedTabs = [];
+      // Keep selectedTabs and context pills - only clear screenshots
       capturedScreenshots = [];
-      shadowRoot.querySelectorAll('.context-chip').forEach(chip => chip.remove());
       shadowRoot.querySelectorAll('.screenshot-chip').forEach(chip => chip.remove());
       
       try {
@@ -1734,6 +1722,7 @@
         console.error('Error sending message:', error);
       }
     });
+    
     
     // Close menus when clicking outside
     document.addEventListener('click', (e) => {
@@ -1749,6 +1738,7 @@
       if (event.source !== window) return;
       
       if (event.data.type === 'SPEEDY_TOGGLE_OVERLAY') {
+        console.log('🎯 [Overlay] Received toggle command, current visibility:', isVisible);
         toggleOverlay();
       }
       
@@ -1756,6 +1746,14 @@
         console.log('✅ [Overlay] Received SPEEDY_TABS_RESPONSE:', event.data);
         const tabs = event.data.tabs || [];
         console.log('📋 [Overlay] Tabs count:', tabs.length);
+        
+        // Automatically add the current tab FIRST in context pills
+        const currentTab = tabs.find(tab => tab.active);
+        if (currentTab && !selectedTabs.find(t => t.id === currentTab.id)) {
+          console.log('🔍 [Overlay] Auto-adding current tab to context (as first):', currentTab.title);
+          addContextChip(currentTab, true); // true = add first
+        }
+        
         renderTabList(tabs);
       }
     });
