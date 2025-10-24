@@ -170,28 +170,6 @@ router.post('/:id/generate-title', async (req, res) => {
   }
 });
 
-// Update chat model
-router.patch('/:id/model', async (req, res) => {
-  try {
-    const { model } = req.body;
-    
-    const chat = await Chat.findByIdAndUpdate(
-      req.params.id,
-      { model, updatedAt: new Date() },
-      { new: true }
-    );
-    
-    if (!chat) {
-      return res.status(404).json({ error: 'Chat not found' });
-    }
-    
-    res.json(chat);
-  } catch (error) {
-    console.error('Error updating chat model:', error);
-    res.status(500).json({ error: 'Failed to update chat model' });
-  }
-});
-
 // Delete chat
 router.delete('/:id', async (req, res) => {
   try {
