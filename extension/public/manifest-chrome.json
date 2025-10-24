@@ -15,7 +15,7 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost:3001/*",
+    "https://speedy-api.onrender.com/*",
     "https://openrouter.ai/*",
     "<all_urls>"
   ],

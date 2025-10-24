@@ -414,7 +414,8 @@ async function extractTabContent(tabId) {
 // Handle API requests (proxy to avoid CSP issues)
 async function handleApiRequest(message, sendResponse) {
   const { method, endpoint, body } = message;
-  const API_BASE_URL = 'http://localhost:3001';
+  // TODO: Replace with your production API URL
+  const API_BASE_URL = 'https://speedy-api.onrender.com';
   
   try {
     console.log(`🌐 [Background] API ${method} ${endpoint}`);
@@ -447,7 +448,8 @@ async function handleApiRequest(message, sendResponse) {
 // Handle streaming API requests
 async function handleStreamingApiRequest(message, sendCallback) {
   const { method, endpoint, body } = message;
-  const API_BASE_URL = 'http://localhost:3001';
+  // TODO: Replace with your production API URL
+  const API_BASE_URL = 'https://speedy-api.onrender.com';
   
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
