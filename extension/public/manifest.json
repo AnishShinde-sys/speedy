@@ -32,8 +32,8 @@
   "commands": {
     "toggle-overlay": {
       "suggested_key": {
-        "default": "Ctrl+Alt+A",
-        "mac": "Command+Alt+A"
+        "default": "Ctrl+Shift+K",
+        "mac": "MacCtrl+Shift+K"
       },
       "description": "Toggle AI chat overlay"
     }

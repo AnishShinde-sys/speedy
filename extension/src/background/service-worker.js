@@ -5,26 +5,40 @@
 var browser = (typeof self.browser !== 'undefined') ? self.browser : chrome;
 
 // Handle keyboard shortcuts
+console.log('🚀 [Background] Service worker loaded, registering command listener...');
+
 browser.commands.onCommand.addListener(async (command) => {
-  console.log('⌨️ [Background] Keyboard command received:', command);
+  console.log('⌨️ [Background] ===== KEYBOARD COMMAND RECEIVED =====');
+  console.log('⌨️ [Background] Command:', command);
+  console.log('⌨️ [Background] Timestamp:', new Date().toISOString());
   
   try {
     const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    console.log('📋 [Background] Active tabs:', tabs);
     const tab = tabs && tabs.length > 0 ? tabs[0] : null;
     
     if (command === 'toggle-overlay') {
-      console.log('🎯 [Background] Toggle overlay command, tab:', tab?.id, tab?.url);
-      // Cmd+Option+A - Toggle overlay for quick input and chat
+      console.log('🎯 [Background] Toggle overlay command matched!');
+      console.log('🎯 [Background] Tab ID:', tab?.id);
+      console.log('🎯 [Background] Tab URL:', tab?.url);
+      
       if (tab) {
+        console.log('✅ [Background] Calling toggleOverlay...');
         await toggleOverlay(tab);
+        console.log('✅ [Background] toggleOverlay completed');
       } else {
         console.error('❌ [Background] No active tab found');
       }
+    } else {
+      console.log('⚠️ [Background] Unknown command:', command);
     }
   } catch (error) {
     console.error('❌ [Background] Error handling command:', error);
+    console.error('❌ [Background] Error stack:', error.stack);
   }
 });
+
+console.log('✅ [Background] Command listener registered successfully');
 
 // Handle extension icon click (Chrome MV3 uses action, Firefox MV2 uses browserAction)
 if (browser.action && browser.action.onClicked) {
@@ -41,13 +55,19 @@ if (browser.action && browser.action.onClicked) {
 
 // Toggle overlay function with content script injection fallback
 async function toggleOverlay(tab) {
+  console.log('🔄 [Background] toggleOverlay called');
+  console.log('🔄 [Background] Tab object:', tab);
+  
   if (!tab || !tab.id) {
     console.error('❌ [Background] Invalid tab object');
     return;
   }
   
+  console.log('🔄 [Background] Tab ID is valid:', tab.id);
+  
   // Don't try to inject on chrome:// or other restricted pages
   const url = tab.url || '';
+  console.log('🔄 [Background] Tab URL:', url);
   if (url.startsWith('chrome://') || 
       url.startsWith('chrome-extension://') ||
       url.startsWith('about:')) {

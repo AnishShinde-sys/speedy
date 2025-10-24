@@ -21,8 +21,21 @@ export default defineConfig(({ mode }) => {
           const manifestDest = resolve(dist, 'manifest.json');
           
           if (existsSync(manifestSource)) {
-            copyFileSync(manifestSource, manifestDest);
-            console.log(`✅ Copied ${manifestName} to manifest.json`);
+            let manifestContent = readFileSync(manifestSource, 'utf-8');
+            let manifest = JSON.parse(manifestContent);
+            
+            // For Firefox, convert service_worker to scripts
+            if (isFirefox && manifest.background && manifest.background.service_worker) {
+              console.log('🔧 Converting background.service_worker to background.scripts for Firefox');
+              manifest.background = {
+                scripts: [manifest.background.service_worker],
+                type: "module"
+              };
+            }
+            
+            // Write the modified manifest
+            writeFileSync(manifestDest, JSON.stringify(manifest, null, 2));
+            console.log(`✅ Copied and processed ${manifestName} to manifest.json`);
           } else {
             // Fallback to default manifest.json
             const defaultManifest = resolve(__dirname, 'public/manifest.json');

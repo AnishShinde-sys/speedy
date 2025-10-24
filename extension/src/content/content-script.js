@@ -308,11 +308,19 @@ function clearHighlights() {
 
 // Handle messages from extension
 function setupMessageHandlers() {
+    console.log('🔧 [Content] Setting up message handlers...');
     if (browser && browser.runtime) {
         browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            console.log('📨 [Content] ===== MESSAGE RECEIVED =====');
+            console.log('📨 [Content] Message type:', message.type);
+            console.log('📨 [Content] Full message:', message);
+            console.log('📨 [Content] Sender:', sender);
             handleMessage(message, sendResponse);
             return true; // Keep message channel open for async response
         });
+        console.log('✅ [Content] Message listener registered');
+    } else {
+        console.error('❌ [Content] browser.runtime not available!');
     }
 }
 
@@ -367,12 +375,15 @@ async function handleMessage(message, sendResponse) {
             break;
             
         case "toggle_overlay":
-            console.log('📨 [Content] Received toggle_overlay message, forwarding to overlay');
+            console.log('🎯 [Content] ===== TOGGLE_OVERLAY MATCHED =====');
+            console.log('🎯 [Content] Forwarding to overlay via window.postMessage');
             // Notify overlay to toggle visibility
             window.postMessage({
                 type: 'SPEEDY_TOGGLE_OVERLAY'
             }, '*');
+            console.log('✅ [Content] Message posted to window');
             sendResponse({ success: true });
+            console.log('✅ [Content] Response sent back to background');
             break;
             
         case "insert_text_at_cursor":
@@ -686,7 +697,69 @@ window.addEventListener('message', (event) => {
             })();
         }
     }
+    
+    // Handle overlay state requests
+    if (event.data.type === 'SPEEDY_GET_OVERLAY_STATE') {
+        console.log('📥 [Content] Received SPEEDY_GET_OVERLAY_STATE request');
+        // Get overlay state from storage and send back
+        if (browser && browser.storage) {
+            browser.storage.local.get(['overlayState'], (result) => {
+                console.log('📤 [Content] Retrieved overlay state from storage:', result.overlayState);
+                const state = result.overlayState || { isVisible: false };
+                console.log('📤 [Content] Sending state response:', state);
+                window.postMessage({
+                    type: 'SPEEDY_OVERLAY_STATE_RESPONSE',
+                    state: state
+                }, '*');
+            });
+        } else {
+            console.error('❌ [Content] browser.storage not available');
+        }
+    }
+    
+    // Handle overlay state save requests
+    if (event.data.type === 'SPEEDY_SAVE_OVERLAY_STATE') {
+        const isVisible = event.data.isVisible;
+        console.log('💾 [Content] Received SPEEDY_SAVE_OVERLAY_STATE request:', isVisible);
+        
+        // Save to storage
+        if (browser && browser.storage) {
+            const stateToSave = {
+                overlayState: {
+                    isVisible: isVisible,
+                    timestamp: Date.now()
+                }
+            };
+            console.log('💾 [Content] Saving to storage:', stateToSave);
+            browser.storage.local.set(stateToSave, () => {
+                console.log('✅ [Content] State saved successfully');
+            });
+        } else {
+            console.error('❌ [Content] browser.storage not available');
+        }
+    }
 });
+
+// Listen for storage changes and broadcast to all tabs
+if (browser && browser.storage) {
+    console.log('👂 [Content] Setting up storage change listener');
+    browser.storage.onChanged.addListener((changes, namespace) => {
+        console.log('🔔 [Content] Storage changed:', namespace, changes);
+        if (namespace === 'local' && changes.overlayState) {
+            console.log('🔔 [Content] overlayState changed:', changes.overlayState);
+            console.log('🔔 [Content] New value:', changes.overlayState.newValue);
+            console.log('🔔 [Content] Old value:', changes.overlayState.oldValue);
+            // Broadcast state change to overlay
+            window.postMessage({
+                type: 'SPEEDY_OVERLAY_STATE_CHANGED',
+                state: changes.overlayState.newValue
+            }, '*');
+            console.log('📢 [Content] Broadcasted state change to overlay');
+        }
+    });
+} else {
+    console.error('❌ [Content] browser.storage not available for listener');
+}
 
 // =======================
 // INITIALIZATION
@@ -698,13 +771,17 @@ if (typeof window.__speedyAiInitialized === 'undefined') {
 
     // Initialize the content script
     function initialize() {
-        console.log("🚀 Speedy AI Content Script loaded");
+        console.log("🚀 [Content] ===== SPEEDY AI CONTENT SCRIPT LOADED =====");
+        console.log("🚀 [Content] URL:", window.location.href);
+        console.log("🚀 [Content] Timestamp:", new Date().toISOString());
         
         // Set up message handlers
         setupMessageHandlers();
         
         // Inject overlay
         injectOverlay();
+        
+        console.log("✅ [Content] Initialization complete");
     }
 
     // Auto-initialize if running as a content script
