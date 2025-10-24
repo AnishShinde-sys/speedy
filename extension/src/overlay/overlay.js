@@ -2,6 +2,20 @@
 (function() {
   'use strict';
 
+  // Import analytics functions (will be bundled by Vite)
+  // Note: These will be available through the global scope after bundling
+  const analytics = {
+    trackEvent: (name, props) => {
+      try {
+        if (window.posthog) {
+          window.posthog.capture(name, props);
+        }
+      } catch (e) {
+        console.log('Analytics not available:', e);
+      }
+    }
+  };
+
   // Helper function to make API requests through content script -> background script
   // This avoids CSP issues on strict pages like openrouter.ai
   // The overlay runs in page context, so we use window.postMessage to talk to content script
@@ -1753,6 +1767,13 @@
         return;
       }
       
+      // Track message sent
+      analytics.trackEvent('chat_message_sent', {
+        messageLength: messageText.length,
+        hasContext: contexts.length > 0,
+        contextCount: contexts.length
+      });
+      
       addMessageToUI('user', messageText);
       
       await apiRequest('POST', `/api/chats/${chatId}/message`, {
@@ -3238,9 +3259,13 @@
       originalToggleOverlay();
       if (isVisible) {
         sidebarToggle.style.display = 'flex';
+        // Track overlay opened
+        analytics.trackEvent('overlay_opened');
       } else {
         sidebarToggle.style.display = 'none';
         closeSidebar();
+        // Track overlay closed
+        analytics.trackEvent('overlay_closed');
       }
     };
     

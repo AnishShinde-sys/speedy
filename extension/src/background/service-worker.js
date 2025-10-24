@@ -1,8 +1,14 @@
 // Background service worker for Speedy AI Assistant
 
+// Import analytics (PostHog)
+import { initAnalytics, trackInstall, trackEvent } from '../utils/analytics.js';
+
 // Browser compatibility layer - use self.browser if available (Firefox with polyfill), else chrome
 // Use self to access global scope in both service workers and background pages
 var browser = (typeof self.browser !== 'undefined') ? self.browser : chrome;
+
+// Initialize analytics on service worker startup
+initAnalytics();
 
 // Handle keyboard shortcuts
 console.log('🚀 [Background] Service worker loaded, registering command listener...');
