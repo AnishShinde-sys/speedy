@@ -742,7 +742,7 @@
               margin: 8px 0px 0px 0px;
               height: 22px;
               max-width: 100%;
-              overflow: hidden;
+              overflow: visible;
           ">
             <!-- Left: Model Picker + Upload/Screenshot Buttons -->
             <div style="
@@ -753,9 +753,9 @@
               flex-grow: 0;
               min-width: 0px;
               height: 20px;
-              overflow: hidden;
+              overflow: visible;
             ">
-              <div style="min-width: 0px; max-width: 200px; position: relative; flex-shrink: 1;">
+              <div style="min-width: 0px; max-width: 200px; position: relative; flex-shrink: 1; overflow: visible;">
                 <div id="speedy-model-selector" style="
                   display: flex;
                   gap: 4px;
@@ -835,21 +835,22 @@
                 <!-- Model Dropdown Menu -->
                 <div id="speedy-model-menu" style="
                   display: none;
-                  position: absolute;
-                  bottom: calc(100% + 8px);
-                  left: 0;
+                  position: fixed;
+                  bottom: 80px;
+                  left: 20px;
                   background: rgba(255, 255, 255, 1);
                   border-radius: 12px;
                   box-shadow: rgba(0, 0, 0, 0.15) 0px 8px 24px, rgba(0, 0, 0, 0.05) 0px 2px 8px;
                   max-height: 350px;
                   overflow-y: auto;
                   padding: 8px;
-                  z-index: 1000;
+                  z-index: 10000;
                   min-width: 280px;
+                  pointer-events: auto;
                 ">
                   <div id="all-models"></div>
-                  </div>
                 </div>
+              </div>
               
               <!-- Image Upload Button (Paperclip) -->
               <button type="button" id="speedy-image-upload" style="
@@ -1125,11 +1126,14 @@
     // Fallback models list (main models only)
     const fallbackModels = [
       'openai/gpt-4o',
-      'openai/gpt-3.5-turbo',
+      'openai/gpt-4o-mini',
+      'openai/gpt-4-turbo',
       'anthropic/claude-3.5-sonnet',
+      'anthropic/claude-3-opus',
       'anthropic/claude-3-haiku',
-      'google/gemini-pro',
-      'google/gemini-flash'
+      'google/gemini-pro-1.5',
+      'google/gemini-flash-1.5',
+      'x-ai/grok-beta'
     ];
     
     // Placeholder handling for contenteditable
@@ -1485,37 +1489,48 @@
         const data = await apiRequest('GET', '/api/openrouter/models');
         
         if (data.data && Array.isArray(data.data)) {
-          // Filter to only include main models from big 4 providers
+          // Filter to only include main models (no dev/preview models like haiku)
           const mainModels = [
             // OpenAI - main models only
             'openai/gpt-4o',
             'openai/gpt-4o-mini',
             'openai/gpt-4-turbo',
-            'openai/gpt-3.5-turbo',
+            'openai/chatgpt-4o-latest',
+            'openai/o1',
             'openai/o1-mini',
             
-            // Anthropic - main Claude models
+            // Anthropic - main Claude models (Opus and Sonnet only, no Haiku)
             'anthropic/claude-3.5-sonnet',
-            'anthropic/claude-3.5-haiku',
             'anthropic/claude-3-opus',
-            'anthropic/claude-3-haiku',
+            'anthropic/claude-opus-4-20250514',
             
             // Google - main Gemini models
-            'google/gemini-2.5-flash',
-            'google/gemini-pro',
-            'google/gemini-flash',
+            'google/gemini-pro-1.5',
+            'google/gemini-flash-1.5',
+            'google/gemini-2.0-flash-exp',
             
             // X.AI - main Grok models
-            'x-ai/grok-4',
-            'x-ai/grok-4-fast'
+            'x-ai/grok-beta',
+            'x-ai/grok-2-1212',
+            'x-ai/grok-2'
           ];
           
           const filteredModels = data.data.filter(model => {
             return mainModels.includes(model.id);
           });
           
-          // Sort models alphabetically by name within each provider
+          // Sort models by provider and then by name
           availableModels = filteredModels.sort((a, b) => {
+            const providerA = a.id.split('/')[0];
+            const providerB = b.id.split('/')[0];
+            
+            // Sort by provider first
+            if (providerA !== providerB) {
+              const providerOrder = ['openai', 'anthropic', 'google', 'x-ai'];
+              return providerOrder.indexOf(providerA) - providerOrder.indexOf(providerB);
+            }
+            
+            // Then sort by name within provider
             const nameA = (a.name || a.id).toLowerCase();
             const nameB = (b.name || b.id).toLowerCase();
             return nameA.localeCompare(nameB);
@@ -1541,22 +1556,30 @@
         // Extract short name from full name
         const name = model.name.toLowerCase();
         if (name.includes('sonnet')) return 'sonnet';
-        if (name.includes('haiku')) return 'haiku';
         if (name.includes('opus')) return 'opus';
+        if (name.includes('gpt-4o')) return 'gpt-4o';
         if (name.includes('gpt-4')) return 'gpt-4';
-        if (name.includes('gpt-3.5')) return 'gpt-3.5';
-        if (name.includes('gemini')) return 'gemini';
-        if (name.includes('llama')) return 'llama';
+        if (name.includes('chatgpt')) return 'chatgpt';
+        if (name.includes('o1')) return 'o1';
+        if (name.includes('gemini')) {
+          if (name.includes('flash')) return 'gemini-flash';
+          if (name.includes('pro')) return 'gemini-pro';
+          return 'gemini';
+        }
+        if (name.includes('grok')) return 'grok';
         return model.name;
       }
       // Format the ID nicely - extract last part
       const parts = modelId.split('/');
       const lastPart = parts[parts.length - 1];
       if (lastPart.includes('sonnet')) return 'sonnet';
-      if (lastPart.includes('haiku')) return 'haiku';
       if (lastPart.includes('opus')) return 'opus';
+      if (lastPart.includes('gpt-4o')) return 'gpt-4o';
       if (lastPart.includes('gpt-4')) return 'gpt-4';
-      if (lastPart.includes('gpt-3.5')) return 'gpt-3.5';
+      if (lastPart.includes('chatgpt')) return 'chatgpt';
+      if (lastPart.includes('o1')) return 'o1';
+      if (lastPart.includes('gemini')) return 'gemini';
+      if (lastPart.includes('grok')) return 'grok';
       return lastPart.split('-')[0];
     }
     
@@ -1586,15 +1609,35 @@
       button.type = 'button';
       const isSelected = selectedModel === model.id;
       
-      // Get clean model name without provider prefix
-      let displayName = model.name || model.id.split('/').pop();
+      // Get provider and model name
+      const [provider, ...modelParts] = model.id.split('/');
+      const modelName = modelParts.join('/');
       
-      // Clean up the display name to be more readable
-      displayName = displayName
-        .replace(/^(gpt-|claude-|gemini-|grok-)/i, '')
-        .replace(/-/g, ' ')
-        .replace(/\b\w/g, l => l.toUpperCase());
+      // Create a nice display name
+      let displayName = model.name || modelName;
       
+      // Format provider name
+      const providerMap = {
+        'openai': 'OpenAI',
+        'anthropic': 'Anthropic',
+        'google': 'Google',
+        'x-ai': 'xAI'
+      };
+      const providerDisplay = providerMap[provider] || provider;
+      
+      // Clean up model name for better readability
+      let cleanModelName = displayName;
+      if (displayName.toLowerCase().includes('claude')) {
+        cleanModelName = displayName.replace(/claude-/i, 'Claude ').replace(/-/g, ' ');
+      } else if (displayName.toLowerCase().includes('gpt')) {
+        cleanModelName = displayName.replace(/gpt-/i, 'GPT-').replace(/-/g, ' ');
+      } else if (displayName.toLowerCase().includes('gemini')) {
+        cleanModelName = displayName.replace(/gemini-/i, 'Gemini ').replace(/-/g, ' ');
+      } else if (displayName.toLowerCase().includes('grok')) {
+        cleanModelName = displayName.replace(/grok-/i, 'Grok ').replace(/-/g, ' ');
+      }
+      
+      // Create button with provider badge
       button.style.cssText = `
         width: 100%;
         text-align: left;
@@ -1608,9 +1651,32 @@
         cursor: pointer;
         transition: background 0.1s;
         font-weight: ${isSelected ? '600' : '500'};
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        pointer-events: auto;
       `;
       
-      button.textContent = displayName;
+      // Add provider badge
+      const badge = document.createElement('span');
+      badge.style.cssText = `
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.05);
+        color: rgba(0, 0, 0, 0.6);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      `;
+      badge.textContent = providerDisplay;
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = cleanModelName;
+      nameSpan.style.flex = '1';
+      
+      button.appendChild(badge);
+      button.appendChild(nameSpan);
       
       button.addEventListener('mouseenter', () => {
         if (!isSelected) {
@@ -1652,11 +1718,6 @@
       modelChevron.style.transform = 'rotate(180deg)';
       modelSelector.style.background = 'rgba(255, 255, 255, 0.05)';
       console.log('🔧 [Overlay] Menu display set to block, computed style:', window.getComputedStyle(modelMenu).display);
-    }
-    
-    function updateModelDisplay() {
-      const displayName = selectedModel.split('/').pop();
-      modelName.textContent = displayName;
     }
     
     // ========== CHAT FUNCTIONS ==========
@@ -2975,57 +3036,42 @@
       form.style.borderColor = 'rgba(255, 255, 255, 0.15)';
     });
     
-    // Screenshot capture handler
+    // Screenshot capture handler with region selection
     screenshotBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      
+
       try {
-        const requestId = `screenshot_${Date.now()}`;
-        
-        // Listen for response
-        const messageHandler = (event) => {
-          if (event.source !== window) return;
-          if (event.data.type === 'SPEEDY_SCREENSHOT_RESPONSE' && event.data.requestId === requestId) {
-            window.removeEventListener('message', messageHandler);
-            
-            if (event.data.success && event.data.dataUrl) {
-              // Add screenshot to captured list
-              const screenshot = {
-                id: `screenshot-${Date.now()}`,
-                dataUrl: event.data.dataUrl,
-                timestamp: new Date().toISOString(),
-                thumbnail: event.data.dataUrl // We'll use same for now
-              };
-              
-              capturedScreenshots.push(screenshot);
-              
-              // Add screenshot chip to context
-              addScreenshotChip(screenshot);
-              
-              // Show notification
-              showNotification('Screenshot captured!');
-            } else {
-              showNotification('Screenshot capture failed');
-            }
-          }
-        };
-        
-        window.addEventListener('message', messageHandler);
-        
-        // Send request to content script
+        // Send message to content script, which will forward to background
         window.postMessage({
-          type: 'SPEEDY_CAPTURE_SCREENSHOT',
-          requestId
+          type: 'SPEEDY_CAPTURE_SCREENSHOT'
         }, '*');
-        
-        // Timeout after 5 seconds
-        setTimeout(() => {
-          window.removeEventListener('message', messageHandler);
-        }, 5000);
       } catch (error) {
         console.error('Screenshot failed:', error);
         showNotification('Screenshot capture failed');
+      }
+    });
+    
+    // Listen for screenshot captured message from content script
+    window.addEventListener('message', (event) => {
+      if (event.source !== window) return;
+      
+      if (event.data.type === 'SPEEDY_SCREENSHOT_CAPTURED') {
+        // Add screenshot to captured list
+        const screenshot = {
+          id: `screenshot-${Date.now()}`,
+          dataUrl: event.data.dataUrl,
+          timestamp: new Date().toISOString(),
+          thumbnail: event.data.dataUrl
+        };
+
+        capturedScreenshots.push(screenshot);
+        
+        // Add screenshot chip to context
+        addScreenshotChip(screenshot);
+        
+        // Show notification
+        showNotification('Screenshot captured!');
       }
     });
     

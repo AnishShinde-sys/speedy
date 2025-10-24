@@ -102,6 +102,30 @@ Use this contextual information to provide more accurate and relevant responses.
   }
 });
 
+// Get available models
+router.get('/models', async (req, res) => {
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/models`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`OpenRouter API error: ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching models:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch models' });
+  }
+});
+
 export default router;
 
 

@@ -153,6 +153,24 @@ async function handleMessage(message, sender, sendResponse) {
         await handleCaptureScreenshot(sender.tab, sendResponse);
         break;
         
+      case 'add-screenshot-to-context':
+        // Forward screenshot data to overlay/content script
+        console.log('📸 [Background] Screenshot captured, forwarding to overlay');
+        if (sender.tab?.id) {
+          try {
+            await browser.tabs.sendMessage(sender.tab.id, {
+              type: 'SCREENSHOT_CAPTURED',
+              imageData: message.imageData,
+              dataUrl: message.dataUrl
+            });
+            sendResponse({ success: true });
+          } catch (error) {
+            console.error('[Background] Failed to forward screenshot:', error);
+            sendResponse({ success: false, error: error.message });
+          }
+        }
+        break;
+        
       case 'API_REQUEST':
         await handleApiRequest(message, sendResponse);
         break;
@@ -318,7 +336,7 @@ async function handleGetSelectedText(tabId, sendResponse) {
   }
 }
 
-// Capture screenshot of visible tab
+// Capture screenshot of visible tab with region selection
 async function handleCaptureScreenshot(tab, sendResponse) {
   try {
     if (!tab || !tab.id) {
@@ -326,13 +344,406 @@ async function handleCaptureScreenshot(tab, sendResponse) {
       return;
     }
     
-    // Capture the visible tab
-    const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
+    // Check if screenshot overlay already exists in the tab
+    const [overlayExists] = await browser.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => !!document.getElementById("screenshot-overlay")
+    });
+
+    // If overlay exists, restore the page and exit
+    if (overlayExists?.result) {
+      await browser.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          const restoreFunction = window.__screenshotRestore;
+          if (restoreFunction) {
+            restoreFunction();
+          }
+        }
+      });
+      sendResponse({ success: false, cancelled: true });
+      return;
+    }
+
+    // Capture the visible tab as PNG
+    const screenshotDataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
       format: 'png',
       quality: 100
     });
     
-    sendResponse({ success: true, dataUrl });
+    // Inject the screenshot selection UI into the page
+    await browser.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (imageDataUrl) => {
+        // Save original scroll position and overflow styles
+        const originalBodyOverflow = document.body.style.overflow;
+        const originalHtmlOverflow = document.documentElement.style.overflow;
+        const originalScrollX = window.scrollX;
+        const originalScrollY = window.scrollY;
+
+        // ===== UI CREATION FUNCTIONS =====
+
+        // Create full-screen overlay container
+        const createOverlay = () => {
+          const overlay = document.createElement("div");
+          overlay.id = "screenshot-overlay";
+          overlay.style.cssText = `
+            position: fixed;
+            inset: 0;
+            z-index: 999999;
+            background: #fff;
+            cursor: crosshair;
+            margin: 0;
+            padding: 0;
+          `;
+          return overlay;
+        };
+
+        // Create screenshot image element
+        const createScreenshotImage = () => {
+          const img = document.createElement("img");
+          img.src = imageDataUrl;
+          img.alt = "Screenshot";
+          img.style.cssText = `
+            width: 100vw;
+            height: 100vh;
+            object-fit: contain;
+            display: block;
+            user-select: none;
+          `;
+          return img;
+        };
+
+        // Create gradient overlay at top
+        const createGradientOverlay = () => {
+          const gradient = document.createElement("div");
+          gradient.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 120px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+            z-index: 1000000;
+            pointer-events: none;
+          `;
+          return gradient;
+        };
+
+        // Create instruction box
+        const createInstructionBox = () => {
+          const box = document.createElement("div");
+          box.id = "instruction-box";
+          box.innerHTML = `
+            <span style="color:#374151;font-family:ui-sans-serif,system-ui,sans-serif;">
+              Select a region to capture • Press ESC to cancel
+            </span>
+          `;
+          box.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(210,210,210,0.6);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            border-radius: 12px;
+            padding: 8px 16px;
+            font-size: 12px;
+            box-shadow: 0 0 6px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,0,0,0.1);
+            z-index: 1000001;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            font-family: ui-sans-serif,system-ui,sans-serif;
+          `;
+          return box;
+        };
+
+        // Create selection rectangle
+        const createSelectionBox = () => {
+          const box = document.createElement("div");
+          box.style.cssText = `
+            position: absolute;
+            border: 2px solid #1F4EF3;
+            background: rgba(0,123,255,.1);
+            pointer-events: none;
+            z-index: 1000000;
+            border-radius: 12px;
+          `;
+          return box;
+        };
+
+        // Update selection box position and size
+        const updateSelectionBox = (
+          selectionBox,
+          imageElement,
+          startX,
+          startY,
+          currentX,
+          currentY
+        ) => {
+          const imgRect = imageElement.getBoundingClientRect();
+          
+          // Calculate relative coordinates
+          const relativeCurrentX = currentX - imgRect.left;
+          const relativeCurrentY = currentY - imgRect.top;
+          
+          // Calculate top-left corner (minimum of start and current)
+          const left = Math.min(startX, relativeCurrentX);
+          const top = Math.min(startY, relativeCurrentY);
+          
+          // Calculate width and height (absolute difference)
+          const width = Math.abs(relativeCurrentX - startX);
+          const height = Math.abs(relativeCurrentY - startY);
+          
+          // Update selection box styles
+          selectionBox.style.left = left + imgRect.left + "px";
+          selectionBox.style.top = top + imgRect.top + "px";
+          selectionBox.style.width = width + "px";
+          selectionBox.style.height = height + "px";
+        };
+
+        // Crop image based on selection
+        const cropImage = (
+          imageElement,
+          cropX,
+          cropY,
+          cropWidth,
+          cropHeight,
+          imageRect
+        ) => {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          
+          // Get natural (original) image dimensions
+          const naturalSize = {
+            w: imageElement.naturalWidth,
+            h: imageElement.naturalHeight
+          };
+          
+          // Calculate scaling factors
+          const scaleX = naturalSize.w / imageRect.width;
+          const scaleY = naturalSize.h / imageRect.height;
+          
+          // Convert screen coordinates to image coordinates
+          const sourceX = cropX * scaleX;
+          const sourceY = cropY * scaleY;
+          const sourceWidth = cropWidth * scaleX;
+          const sourceHeight = cropHeight * scaleY;
+          
+          // Set canvas size to cropped dimensions
+          canvas.width = sourceWidth;
+          canvas.height = sourceHeight;
+          
+          // Draw cropped region
+          ctx?.drawImage(
+            imageElement,
+            sourceX,
+            sourceY,
+            sourceWidth,
+            sourceHeight,
+            0,
+            0,
+            sourceWidth,
+            sourceHeight
+          );
+          
+          // Return as base64 PNG data URL
+          return canvas.toDataURL("image/png");
+        };
+
+        // ===== INITIALIZE UI =====
+
+        const overlay = createOverlay();
+        const screenshotImage = createScreenshotImage();
+        const gradientOverlay = createGradientOverlay();
+        const instructionBox = createInstructionBox();
+
+        // Disable scrolling
+        document.body.style.overflow = "hidden";
+        document.documentElement.style.overflow = "hidden";
+
+        // Add elements to page
+        document.body.appendChild(overlay);
+        overlay.appendChild(screenshotImage);
+        overlay.appendChild(gradientOverlay);
+        overlay.appendChild(instructionBox);
+
+        // ===== STATE VARIABLES =====
+
+        let isSelecting = false;
+        let startX = 0;
+        let startY = 0;
+        let selectionBox = null;
+
+        // ===== KEYBOARD HANDLER =====
+
+        const handleKeyDown = (event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            isSelecting = false;
+            if (selectionBox) {
+              selectionBox.remove();
+              selectionBox = null;
+            }
+            cleanup();
+          }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+
+        // ===== CLEANUP FUNCTION =====
+
+        const cleanup = () => {
+          // Remove selection box
+          if (selectionBox) {
+            selectionBox.remove();
+            selectionBox = null;
+          }
+
+          // Remove overlay
+          overlay.remove();
+
+          // Restore original styles
+          document.body.style.overflow = originalBodyOverflow;
+          document.documentElement.style.overflow = originalHtmlOverflow;
+
+          // Restore scroll position
+          window.scrollTo(originalScrollX, originalScrollY);
+
+          // Reset state
+          isSelecting = false;
+
+          // Remove event listeners
+          window.removeEventListener("resize", cleanup);
+          resizeObserver?.disconnect();
+          document.removeEventListener("keydown", handleKeyDown);
+
+          // Clear restore function
+          window.__screenshotRestore = null;
+        };
+
+        // Store cleanup function globally for external access
+        window.__screenshotRestore = cleanup;
+
+        // ===== MOUSE EVENT HANDLERS =====
+
+        // Mouse down - start selection
+        overlay.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          isSelecting = true;
+
+          // Hide instruction box
+          instructionBox.style.display = "none";
+
+          // Get click position relative to image
+          const imgRect = screenshotImage.getBoundingClientRect();
+          startX = event.clientX - imgRect.left;
+          startY = event.clientY - imgRect.top;
+
+          // Create and add selection box
+          selectionBox = createSelectionBox();
+          overlay.appendChild(selectionBox);
+        });
+
+        // Mouse move - update selection
+        document.addEventListener("mousemove", (event) => {
+          if (!isSelecting || !selectionBox) return;
+
+          updateSelectionBox(
+            selectionBox,
+            screenshotImage,
+            startX,
+            startY,
+            event.clientX,
+            event.clientY
+          );
+        });
+
+        // Mouse up - finalize selection and crop
+        document.addEventListener("mouseup", (event) => {
+          if (!isSelecting || !selectionBox) return;
+
+          isSelecting = false;
+
+          // Calculate final selection bounds
+          const imgRect = screenshotImage.getBoundingClientRect();
+          const endX = event.clientX - imgRect.left;
+          const endY = event.clientY - imgRect.top;
+
+          const cropX = Math.min(startX, endX);
+          const cropY = Math.min(startY, endY);
+          const cropWidth = Math.abs(endX - startX);
+          const cropHeight = Math.abs(endY - startY);
+
+          // Remove selection box
+          selectionBox.remove();
+          selectionBox = null;
+
+          // Check if selection is too small (accidental click)
+          if (cropWidth < 5 && cropHeight < 5) {
+            cleanup();
+            return;
+          }
+
+          // Check minimum size
+          if (cropWidth < 10 || cropHeight < 10) {
+            return;
+          }
+
+          // Crop the image
+          const croppedImageDataUrl = cropImage(
+            screenshotImage,
+            cropX,
+            cropY,
+            cropWidth,
+            cropHeight,
+            imgRect
+          );
+
+          // Extract base64 data (remove "data:image/png;base64," prefix)
+          const base64Data = croppedImageDataUrl.split(",")[1];
+
+          // Send to extension background
+          if (typeof chrome !== 'undefined' && chrome.runtime) {
+            chrome.runtime.sendMessage({
+              type: "add-screenshot-to-context",
+              imageData: base64Data,
+              dataUrl: croppedImageDataUrl
+            });
+          }
+
+          // Cleanup
+          cleanup();
+        });
+
+        // ===== WINDOW RESIZE HANDLER =====
+
+        const initialWidth = window.innerWidth;
+
+        // Use ResizeObserver if available
+        const resizeObserver = window.ResizeObserver
+          ? new ResizeObserver(() => {
+              if (window.innerWidth !== initialWidth) {
+                cleanup();
+              }
+            })
+          : null;
+
+        resizeObserver?.observe(document.body);
+
+        // Fallback resize listener
+        window.addEventListener("resize", cleanup);
+      },
+      args: [screenshotDataUrl]
+    });
+
+    // Return success - actual screenshot will be sent via message
+    sendResponse({ success: true, message: 'Screenshot capture initiated' });
+
   } catch (error) {
     console.error('[Background] Screenshot capture failed:', error);
     sendResponse({ success: false, error: error.message });
@@ -414,8 +825,8 @@ async function extractTabContent(tabId) {
 // Handle API requests (proxy to avoid CSP issues)
 async function handleApiRequest(message, sendResponse) {
   const { method, endpoint, body } = message;
-  // TODO: Replace with your production API URL
-  const API_BASE_URL = 'https://speedy-api.onrender.com';
+  // Use localhost for development, production URL for production
+  const API_BASE_URL = 'http://localhost:3001';
   
   try {
     console.log(`🌐 [Background] API ${method} ${endpoint}`);
@@ -448,8 +859,8 @@ async function handleApiRequest(message, sendResponse) {
 // Handle streaming API requests
 async function handleStreamingApiRequest(message, sendCallback) {
   const { method, endpoint, body } = message;
-  // TODO: Replace with your production API URL
-  const API_BASE_URL = 'https://speedy-api.onrender.com';
+  // Use localhost for development, production URL for production
+  const API_BASE_URL = 'http://localhost:3001';
   
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {

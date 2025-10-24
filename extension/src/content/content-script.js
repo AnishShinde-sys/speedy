@@ -404,6 +404,17 @@ async function handleMessage(message, sendResponse) {
             }
             break;
             
+        case "SCREENSHOT_CAPTURED":
+            console.log('📸 [Content] Screenshot captured, forwarding to overlay');
+            // Forward screenshot to overlay
+            window.postMessage({
+                type: 'SPEEDY_SCREENSHOT_CAPTURED',
+                dataUrl: message.dataUrl,
+                imageData: message.imageData
+            }, '*');
+            sendResponse({ success: true });
+            break;
+            
         default:
             sendResponse({ success: false, error: "Unknown message type" });
     }
