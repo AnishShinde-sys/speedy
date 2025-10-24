@@ -6,15 +6,17 @@ export default defineConfig(({ mode }) => {
   // Determine which browser we're building for based on mode
   const isFirefox = mode === 'firefox';
   const manifestName = isFirefox ? 'manifest-firefox.json' : 'manifest-chrome.json';
+  const distFolder = isFirefox ? 'dist-firefox' : 'dist';
   
-  console.log(`\n🎯 Building for: ${isFirefox ? 'Firefox' : 'Chrome'}\n`);
+  console.log(`\n🎯 Building for: ${isFirefox ? 'Firefox' : 'Chrome'}`);
+  console.log(`📁 Output folder: ${distFolder}\n`);
   
   return {
     plugins: [
       {
         name: 'copy-manifest-and-assets',
         closeBundle() {
-          const dist = resolve(__dirname, 'dist');
+          const dist = resolve(__dirname, distFolder);
           
           // Copy the appropriate manifest file
           const manifestSource = resolve(__dirname, 'public', manifestName);
@@ -107,7 +109,7 @@ export default defineConfig(({ mode }) => {
       }
     ],
     build: {
-      outDir: 'dist',
+      outDir: distFolder,
       emptyOutDir: true,
       rollupOptions: {
         input: {

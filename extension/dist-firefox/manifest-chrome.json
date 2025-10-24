@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Speedy AI Assistant",
+  "version": "1.0.0",
+  "description": "AI-powered chat assistant with context awareness",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:3001/*",
+    "https://openrouter.ai/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/content-script.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "commands": {
+    "toggle-overlay": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "MacCtrl+Shift+K"
+      },
+      "description": "Toggle AI chat overlay"
+    }
+  },
+  "action": {
+    "default_title": "Speedy AI Assistant",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["overlay/overlay.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
