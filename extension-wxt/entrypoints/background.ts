@@ -444,6 +444,24 @@ export default defineBackground(() => {
             overlay.appendChild(selectionBox);
           });
   
+          document.addEventListener("mousemove", (event) => {
+            if (!isSelecting || !selectionBox) return;
+            
+            const imgRect = screenshotImage.getBoundingClientRect();
+            const currentX = event.clientX - imgRect.left;
+            const currentY = event.clientY - imgRect.top;
+            
+            const left = Math.min(startX, currentX);
+            const top = Math.min(startY, currentY);
+            const width = Math.abs(currentX - startX);
+            const height = Math.abs(currentY - startY);
+            
+            selectionBox.style.left = (left + imgRect.left) + "px";
+            selectionBox.style.top = (top + imgRect.top) + "px";
+            selectionBox.style.width = width + "px";
+            selectionBox.style.height = height + "px";
+          });
+  
           document.addEventListener("mouseup", (event) => {
             if (!isSelecting || !selectionBox) return;
             isSelecting = false;
