@@ -212,11 +212,6 @@ function setupMessageHandlers() {
       container.id = 'speedy-ai-overlay-root';
       document.body.appendChild(container);
       
-      // Load the FAB script (floating action button)
-      const fabScript = document.createElement('script');
-      fabScript.src = browserAPI.runtime.getURL('content-scripts/fab.js');
-      (document.head || document.documentElement).appendChild(fabScript);
-      
       // Load the overlay script
       const overlayScript = document.createElement('script');
       overlayScript.src = browserAPI.runtime.getURL('content-scripts/overlay.js');

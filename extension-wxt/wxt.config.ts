@@ -39,7 +39,7 @@ export default defineConfig({
     ],
     web_accessible_resources: [
       {
-        resources: ['content-scripts/overlay.js', 'content-scripts/fab.js'],
+        resources: ['content-scripts/overlay.js'],
         matches: ['<all_urls>']
       }
     ]
