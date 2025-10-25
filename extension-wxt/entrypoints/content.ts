@@ -27,74 +27,74 @@ export default defineContentScript({
     // Listen for messages from overlay
     setupOverlayBridge();
     
-    function setupMessageHandlers() {
-      console.log('🔧 [Content] Setting up message handlers...');
+function setupMessageHandlers() {
+    console.log('🔧 [Content] Setting up message handlers...');
       
       if (browserAPI && browserAPI.runtime) {
         browserAPI.runtime.onMessage.addListener((message: any, sender: any, sendResponse: any) => {
-          console.log('📨 [Content] ===== MESSAGE RECEIVED =====');
-          console.log('📨 [Content] Message type:', message.type);
+            console.log('📨 [Content] ===== MESSAGE RECEIVED =====');
+            console.log('📨 [Content] Message type:', message.type);
           
-          handleMessage(message, sendResponse);
-          return true; // Keep message channel open for async response
+            handleMessage(message, sendResponse);
+            return true; // Keep message channel open for async response
         });
         console.log('✅ [Content] Message listener registered');
-      }
     }
-    
+}
+
     async function handleMessage(message: any, sendResponse: any) {
-      switch (message.type) {
+    switch (message.type) {
         case "get_page_content":
           // Will be handled by injected script
-          break;
-          
+            break;
+            
         case "get_selected_text":
-          try {
-            const selection = window.getSelection();
+            try {
+                const selection = window.getSelection();
             const text = selection ? selection.toString() : '';
-            sendResponse({
-              success: true,
-              text: text
-            });
+                sendResponse({
+                    success: true,
+                    text: text
+                });
           } catch (error: any) {
-            sendResponse({
-              success: false,
-              error: error.message
-            });
-          }
-          break;
-          
+                sendResponse({
+                    success: false,
+                    error: error.message
+                });
+            }
+            break;
+            
         case "toggle_overlay":
           console.log('🎯 [Content] Toggle overlay command');
-          window.postMessage({
-            type: 'SPEEDY_TOGGLE_OVERLAY'
-          }, '*');
-          sendResponse({ success: true });
-          break;
-          
+            window.postMessage({
+                type: 'SPEEDY_TOGGLE_OVERLAY'
+            }, '*');
+            sendResponse({ success: true });
+            break;
+            
         case "SCREENSHOT_CAPTURED":
-          console.log('📸 [Content] Screenshot captured, forwarding to overlay');
-          window.postMessage({
-            type: 'SPEEDY_SCREENSHOT_CAPTURED',
-            dataUrl: message.dataUrl,
-            imageData: message.imageData
-          }, '*');
-          sendResponse({ success: true });
-          break;
-          
+            console.log('📸 [Content] Screenshot captured, forwarding to overlay');
+            window.postMessage({
+                type: 'SPEEDY_SCREENSHOT_CAPTURED',
+                dataUrl: message.dataUrl,
+                imageData: message.imageData
+            }, '*');
+            sendResponse({ success: true });
+            break;
+            
         default:
-          sendResponse({ success: false, error: "Unknown message type" });
-      }
+            sendResponse({ success: false, error: "Unknown message type" });
     }
-    
+}
+
     function setupOverlayBridge() {
-      // Listen for messages from overlay (page context) and relay to background
+// Listen for messages from overlay (page context) and relay to background
       window.addEventListener('message', async (event) => {
-        // Only accept messages from same window
-        if (event.source !== window) return;
-        
-        // Handle overlay submit
-        if (event.data.type === 'SPEEDY_OVERLAY_SUBMIT') {
+    // Only accept messages from same window
+    if (event.source !== window) return;
+    
+    // Handle overlay submit
+    if (event.data.type === 'SPEEDY_OVERLAY_SUBMIT') {
           // Forward to background
           console.log('💬 [SPEEDY] Message being sent to AI');
         }
@@ -103,57 +103,57 @@ export default defineContentScript({
         if (event.data.type === 'SPEEDY_GET_TABS') {
           try {
             const response = await browserAPI.runtime.sendMessage({
-              type: 'GET_ALL_TABS'
-            });
-            
-            if (response && response.success) {
-              window.postMessage({
-                type: 'SPEEDY_TABS_RESPONSE',
-                tabs: response.tabs
-              }, '*');
-            }
+                        type: 'GET_ALL_TABS'
+                    });
+                    
+                    if (response && response.success) {
+                        window.postMessage({
+                            type: 'SPEEDY_TABS_RESPONSE',
+                            tabs: response.tabs
+                        }, '*');
+                    }
           } catch (err: any) {
-            console.log('Failed to get tabs:', err.message);
-          }
+                    console.log('Failed to get tabs:', err.message);
         }
+    }
+    
+    // Handle API requests from overlay
+    if (event.data.type === 'SPEEDY_API_REQUEST') {
+        const { requestId, method, endpoint, body } = event.data;
         
-        // Handle API requests from overlay
-        if (event.data.type === 'SPEEDY_API_REQUEST') {
-          const { requestId, method, endpoint, body } = event.data;
-          
           try {
             const response = await browserAPI.runtime.sendMessage({
-              type: 'API_REQUEST',
-              method,
-              endpoint,
-              body
-            });
-            
-            // Send response back to overlay
-            window.postMessage({
-              type: 'SPEEDY_API_RESPONSE',
-              requestId,
-              success: response.success,
-              data: response.data,
-              error: response.error
-            }, '*');
+                        type: 'API_REQUEST',
+                        method,
+                        endpoint,
+                        body
+                    });
+                    
+                    // Send response back to overlay
+                    window.postMessage({
+                        type: 'SPEEDY_API_RESPONSE',
+                        requestId,
+                        success: response.success,
+                        data: response.data,
+                        error: response.error
+                    }, '*');
           } catch (err: any) {
-            window.postMessage({
-              type: 'SPEEDY_API_RESPONSE',
-              requestId,
-              success: false,
-              error: err.message || 'API request failed'
-            }, '*');
-          }
+                    window.postMessage({
+                        type: 'SPEEDY_API_RESPONSE',
+                        requestId,
+                        success: false,
+                        error: err.message || 'API request failed'
+                    }, '*');
+                }
         }
         
         // Handle screenshot capture request
         if (event.data.type === 'SPEEDY_CAPTURE_SCREENSHOT') {
-          try {
+                try {
             const response = await browserAPI.runtime.sendMessage({
-              type: 'CAPTURE_SCREENSHOT'
-            });
-            
+                        type: 'CAPTURE_SCREENSHOT'
+                    });
+                    
             if (!response?.success) {
               console.log('📸 [Content] Screenshot capture failed');
             }
@@ -202,15 +202,20 @@ export default defineContentScript({
     
     function injectOverlay() {
       // Check if already injected
-      if (document.getElementById('speedy-overlay-container')) {
+      if (document.getElementById('speedy-ai-overlay-root')) {
         console.log('⚠️ Overlay already injected');
         return;
       }
       
       // Create container
       const container = document.createElement('div');
-      container.id = 'speedy-overlay-container';
+      container.id = 'speedy-ai-overlay-root';
       document.body.appendChild(container);
+      
+      // Load the FAB script (floating action button)
+      const fabScript = document.createElement('script');
+      fabScript.src = browserAPI.runtime.getURL('content-scripts/fab.js');
+      (document.head || document.documentElement).appendChild(fabScript);
       
       // Load the overlay script
       const overlayScript = document.createElement('script');
@@ -218,9 +223,9 @@ export default defineContentScript({
       overlayScript.type = 'module';
       (document.head || document.documentElement).appendChild(overlayScript);
       
-      console.log('✅ Overlay injected');
+      console.log('✅ Overlay and FAB injected');
     }
-    
-    console.log("✅ [Content] Initialization complete");
-  }
+        
+        console.log("✅ [Content] Initialization complete");
+    }
 });

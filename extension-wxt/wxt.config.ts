@@ -29,6 +29,19 @@ export default defineConfig({
       '16': 'icons/icon16.png',
       '48': 'icons/icon48.png',
       '128': 'icons/icon128.png'
-    }
+    },
+    content_scripts: [
+      {
+        matches: ['<all_urls>'],
+        js: ['content-scripts/content.js'],
+        run_at: 'document_end'
+      }
+    ],
+    web_accessible_resources: [
+      {
+        resources: ['content-scripts/overlay.js', 'content-scripts/fab.js'],
+        matches: ['<all_urls>']
+      }
+    ]
   },
 });
