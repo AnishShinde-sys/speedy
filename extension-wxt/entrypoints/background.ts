@@ -1,11 +1,13 @@
 // Background service worker for Speedy AI Assistant
+
+// Backend API URL - Render backend
+const API_BASE_URL = 'https://speedy-09j8.onrender.com';
+
 export default defineBackground(() => {
   // Import analytics (PostHog)
   // Note: We'll handle this differently in WXT
   
-  // Browser compatibility layer - use browser if available (Firefox), else chrome
-  const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
-  
+  // WXT provides browser global automatically
   console.log('🚀 [Background] Service worker loaded');
   
   // Initialize analytics
@@ -21,13 +23,13 @@ export default defineBackground(() => {
   }
   
   // Handle keyboard shortcuts
-  browserAPI.commands.onCommand.addListener(async (command) => {
+  browser.commands.onCommand.addListener(async (command) => {
     console.log('⌨️ [Background] ===== KEYBOARD COMMAND RECEIVED =====');
     console.log('⌨️ [Background] Command:', command);
     console.log('⌨️ [Background] Timestamp:', new Date().toISOString());
     
     try {
-      const tabs = await browserAPI.tabs.query({ active: true, currentWindow: true });
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const tab = tabs && tabs.length > 0 ? tabs[0] : null;
       
       if (command === 'toggle-overlay') {
@@ -49,8 +51,8 @@ export default defineBackground(() => {
   });
   
   // Handle extension icon click
-  if (browserAPI.action && browserAPI.action.onClicked) {
-    browserAPI.action.onClicked.addListener(async (tab) => {
+  if (browser.action && browser.action.onClicked) {
+    browser.action.onClicked.addListener(async (tab) => {
       await toggleOverlay(tab);
     });
   }
@@ -75,15 +77,15 @@ export default defineBackground(() => {
     
     try {
       // Try to send message to existing content script
-      await browserAPI.tabs.sendMessage(tab.id, { type: 'toggle_overlay' });
+      await browser.tabs.sendMessage(tab.id, { type: 'toggle_overlay' });
     } catch (error) {
       // Content script not loaded, try to inject it
       console.log('Content script not found, injecting...');
       
       try {
-        if (browserAPI.scripting && browserAPI.scripting.executeScript) {
+        if (browser.scripting && browser.scripting.executeScript) {
           // Chrome MV3 way
-          await browserAPI.scripting.executeScript({
+          await browser.scripting.executeScript({
             target: { tabId: tab.id },
             files: ['content-scripts/content.js']
           });
@@ -93,7 +95,7 @@ export default defineBackground(() => {
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Try sending message again
-        await browserAPI.tabs.sendMessage(tab.id, { type: 'toggle_overlay' });
+        await browser.tabs.sendMessage(tab.id, { type: 'toggle_overlay' });
       } catch (injectError) {
         console.error('Failed to inject content script:', injectError);
       }
@@ -101,7 +103,7 @@ export default defineBackground(() => {
   }
   
   // Handle messages from content scripts
-  browserAPI.runtime.onMessage.addListener((message: any, sender: any, sendResponse: any) => {
+  browser.runtime.onMessage.addListener((message: any, sender: any, sendResponse: any) => {
     handleMessage(message, sender, sendResponse);
     return true; // Keep message channel open for async response
   });
@@ -139,7 +141,7 @@ export default defineBackground(() => {
           console.log('📸 [Background] Screenshot captured, forwarding to overlay');
           if (sender.tab?.id) {
             try {
-              await browserAPI.tabs.sendMessage(sender.tab.id, {
+              await browser.tabs.sendMessage(sender.tab.id, {
                 type: 'SCREENSHOT_CAPTURED',
                 imageData: message.imageData,
                 dataUrl: message.dataUrl
@@ -169,7 +171,7 @@ export default defineBackground(() => {
   // Get current active tab
   async function handleGetCurrentTab(sendResponse: any) {
     try {
-      const tabs = await browserAPI.tabs.query({ active: true, currentWindow: true });
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const tab = tabs && tabs.length > 0 ? tabs[0] : null;
       
       if (tab) {
@@ -229,11 +231,11 @@ export default defineBackground(() => {
   // Get all tabs
   async function handleGetAllTabs(sendResponse: any) {
     try {
-      const currentTabs = await browserAPI.tabs.query({ active: true, currentWindow: true });
+      const currentTabs = await browser.tabs.query({ active: true, currentWindow: true });
       const currentTab = currentTabs && currentTabs.length > 0 ? currentTabs[0] : null;
       const currentTabId = currentTab?.id;
       
-      const tabs = await browserAPI.tabs.query({});
+      const tabs = await browser.tabs.query({});
       
       const tabList = await Promise.all(tabs.map(async (tab: any) => {
         let faviconDataUrl = null;
@@ -270,7 +272,7 @@ export default defineBackground(() => {
   // Extract content from specific tab
   async function handleExtractTabContent(tabId: number, sendResponse: any) {
     try {
-      const response = await browserAPI.tabs.sendMessage(tabId, { type: 'get_page_content' });
+      const response = await browser.tabs.sendMessage(tabId, { type: 'get_page_content' });
       
       if (response && response.success) {
         const contentString = response.context?.content || '';
@@ -287,7 +289,7 @@ export default defineBackground(() => {
   // Get selected text from tab
   async function handleGetSelectedText(tabId: number, sendResponse: any) {
     try {
-      const response = await browserAPI.tabs.sendMessage(tabId, { type: 'get_selected_text' });
+      const response = await browser.tabs.sendMessage(tabId, { type: 'get_selected_text' });
       
       if (response && response.success) {
         sendResponse({ success: true, text: response.text });
@@ -308,14 +310,14 @@ export default defineBackground(() => {
       }
       
       // Check if screenshot overlay already exists in the tab
-      const [overlayExists] = await browserAPI.scripting.executeScript({
+      const [overlayExists] = await browser.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => !!document.getElementById("screenshot-overlay")
       });
   
       // If overlay exists, restore the page and exit
       if (overlayExists?.result) {
-        await browserAPI.scripting.executeScript({
+        await browser.scripting.executeScript({
           target: { tabId: tab.id },
           func: () => {
             const restoreFunction = (window as any).__screenshotRestore;
@@ -329,12 +331,12 @@ export default defineBackground(() => {
       }
   
       // Capture the visible tab as PNG
-      const screenshotDataUrl = await browserAPI.tabs.captureVisibleTab(tab.windowId, {
+      const screenshotDataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
         format: 'png' as any
       });
       
       // Inject the screenshot selection UI into the page
-      await browserAPI.scripting.executeScript({
+      await browser.scripting.executeScript({
         target: { tabId: tab.id },
         func: (imageDataUrl: string) => {
           // [Screenshot UI code will be inserted here - keeping original implementation]
@@ -505,8 +507,8 @@ export default defineBackground(() => {
             const croppedImageDataUrl = canvas.toDataURL("image/png");
             const base64Data = croppedImageDataUrl.split(",")[1];
   
-            if (typeof chrome !== 'undefined' && chrome.runtime) {
-              chrome.runtime.sendMessage({
+            if (typeof browser !== 'undefined' && browser.runtime) {
+              browser.runtime.sendMessage({
                 type: "add-screenshot-to-context",
                 imageData: base64Data,
                 dataUrl: croppedImageDataUrl
@@ -536,7 +538,6 @@ export default defineBackground(() => {
   // Handle API requests (proxy to avoid CSP issues)
   async function handleApiRequest(message: any, sendResponse: any) {
     const { method, endpoint, body } = message;
-    const API_BASE_URL = 'http://localhost:3001';
     
     try {
       console.log(`🌐 [Background] API ${method} ${endpoint}`);

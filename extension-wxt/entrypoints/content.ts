@@ -4,9 +4,7 @@ export default defineContentScript({
   runAt: 'document_end',
   
   main() {
-    // Browser compatibility layer
-    const browserAPI = typeof window.browser !== 'undefined' ? window.browser : (self as any).chrome;
-    
+    // WXT provides browser global automatically
     console.log("🚀 [Content] ===== SPEEDY AI CONTENT SCRIPT LOADED =====");
     console.log("🚀 [Content] URL:", window.location.href);
     console.log("🚀 [Content] Timestamp:", new Date().toISOString());
@@ -30,8 +28,8 @@ export default defineContentScript({
 function setupMessageHandlers() {
     console.log('🔧 [Content] Setting up message handlers...');
       
-      if (browserAPI && browserAPI.runtime) {
-        browserAPI.runtime.onMessage.addListener((message: any, sender: any, sendResponse: any) => {
+      if (browser && browser.runtime) {
+        browser.runtime.onMessage.addListener((message: any, sender: any, sendResponse: any) => {
             console.log('📨 [Content] ===== MESSAGE RECEIVED =====');
             console.log('📨 [Content] Message type:', message.type);
           
@@ -102,7 +100,7 @@ function setupMessageHandlers() {
         // Handle tabs request
         if (event.data.type === 'SPEEDY_GET_TABS') {
           try {
-            const response = await browserAPI.runtime.sendMessage({
+            const response = await browser.runtime.sendMessage({
                         type: 'GET_ALL_TABS'
                     });
                     
@@ -122,7 +120,7 @@ function setupMessageHandlers() {
         const { requestId, method, endpoint, body } = event.data;
         
           try {
-            const response = await browserAPI.runtime.sendMessage({
+            const response = await browser.runtime.sendMessage({
                         type: 'API_REQUEST',
                         method,
                         endpoint,
@@ -150,7 +148,7 @@ function setupMessageHandlers() {
         // Handle screenshot capture request
         if (event.data.type === 'SPEEDY_CAPTURE_SCREENSHOT') {
                 try {
-            const response = await browserAPI.runtime.sendMessage({
+            const response = await browser.runtime.sendMessage({
                         type: 'CAPTURE_SCREENSHOT'
                     });
                     
@@ -169,8 +167,8 @@ function setupMessageHandlers() {
             overlayState: { isVisible: event.data.isVisible, isMinimized: false }
           });
           
-          if (browserAPI && browserAPI.storage) {
-            await browserAPI.storage.local.set({
+          if (browser && browser.storage) {
+            await browser.storage.local.set({
               overlayState: {
                 isVisible: event.data.isVisible,
                 isMinimized: false
@@ -184,8 +182,8 @@ function setupMessageHandlers() {
         if (event.data.type === 'SPEEDY_GET_OVERLAY_STATE') {
           console.log('📥 [Content] Received SPEEDY_GET_OVERLAY_STATE request');
           
-          if (browserAPI && browserAPI.storage) {
-            const result = await browserAPI.storage.local.get('overlayState');
+          if (browser && browser.storage) {
+            const result = await browser.storage.local.get('overlayState');
             console.log('📤 [Content] Retrieved overlay state from storage:', result);
             
             window.postMessage({
@@ -214,7 +212,7 @@ function setupMessageHandlers() {
       
       // Load the overlay script
       const overlayScript = document.createElement('script');
-      overlayScript.src = browserAPI.runtime.getURL('content-scripts/overlay.js');
+      overlayScript.src = browser.runtime.getURL('content-scripts/overlay.js');
       overlayScript.type = 'module';
       (document.head || document.documentElement).appendChild(overlayScript);
       
