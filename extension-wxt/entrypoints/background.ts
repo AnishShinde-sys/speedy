@@ -254,11 +254,14 @@ export default defineBackground(() => {
           }
         }
         
+        // Default favicon if none found
+        const defaultFavicon = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="%23666"/></svg>';
+        
         return {
           id: tab.id,
           title: tab.title,
           url: tab.url,
-          favIconUrl: faviconDataUrl || tab.favIconUrl,
+          favIconUrl: faviconDataUrl || defaultFavicon,
           active: tab.id === currentTabId
         };
       }));
