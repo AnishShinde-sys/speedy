@@ -1763,7 +1763,7 @@
           title: 'New Chat',
           model: selectedModel
         });
-        currentChatId = chat._id;
+        currentChatId = chat.id;
         localStorage.setItem('speedy_last_chat_id', currentChatId);
         await loadChats();
         return currentChatId;
@@ -1998,7 +1998,7 @@
     function createChatItem(chat) {
       const item = document.createElement('div');
       item.className = 'speedy-chat-item';
-      if (chat._id === currentChatId) {
+      if (chat.id === currentChatId) {
         item.classList.add('active');
       }
       
@@ -2043,7 +2043,7 @@
       // Click to switch chat
       item.addEventListener('click', async (e) => {
         if (e.target.closest('.speedy-chat-action-btn')) return;
-        await switchToChat(chat._id);
+        await switchToChat(chat.id);
       });
       
       // Action buttons
@@ -2054,11 +2054,11 @@
           const action = btn.dataset.action;
           
           if (action === 'delete') {
-            await deleteChat(chat._id);
+            await deleteChat(chat.id);
           } else if (action === 'rename') {
-            await renameChat(chat._id, chat.title);
+            await renameChat(chat.id, chat.title);
           } else if (action === 'export') {
-            await exportChat(chat._id);
+            await exportChat(chat.id);
           }
         });
       });
@@ -2118,7 +2118,7 @@
           model: selectedModel
         });
         
-        currentChatId = chat._id;
+        currentChatId = chat.id;
         localStorage.setItem('speedy_last_chat_id', currentChatId);
         
         // Clear messages
