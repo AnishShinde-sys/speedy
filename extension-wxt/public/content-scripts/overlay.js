@@ -679,7 +679,7 @@
               <div id="speedy-tab-list" style="
                 display: flex;
                 flex-direction: column;
-                gap: 2px;
+                gap: 1px;
               "></div>
             </div>
           </div>
@@ -1090,6 +1090,10 @@
           }, 100);
         } else {
           console.log('⏭️ [Overlay] No action needed. State visible:', state?.isVisible, 'Current visible:', isVisible);
+          // State loaded, now we can safely initialize FAB visibility
+          setTimeout(() => {
+            initializeFABVisibility();
+          }, 100);
         }
       }
       
@@ -1111,6 +1115,16 @@
     // Load state on init
     console.log('🚀 [Overlay] Initializing overlay state sync');
     loadOverlayState();
+    
+    // Fallback: If no state response comes back after 1 second, show FAB
+    setTimeout(() => {
+      // Only initialize if overlay is still not visible (state never loaded)
+      if (!isVisible && isMinimized) {
+        console.log('⏱️ [Overlay] State response timeout, initializing FAB as fallback');
+        initializeFABVisibility();
+      }
+    }, 1000);
+    
     let availableTabs = [];
     let selectedModel = 'anthropic/claude-3.5-sonnet';
     let availableModels = [];
@@ -1155,7 +1169,6 @@
               color: rgba(255, 255, 255, 0.5);
               opacity: 0.5;
               pointer-events: none;
-              position: absolute;
             }
           `;
           shadowRoot.appendChild(style);
@@ -1345,12 +1358,15 @@
       fab.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)';
     });
     
-    // Initialize: Show FAB on page load
-    setTimeout(() => {
-      fab.style.opacity = '1';
-      fab.style.transform = 'translateX(-50%) scale(1)';
-      fab.style.pointerEvents = 'auto';
-    }, 500);
+    // Initialize: Show FAB only after state is loaded and overlay is confirmed to be hidden
+    function initializeFABVisibility() {
+      // Only show FAB if overlay is not visible
+      if (!isVisible && isMinimized) {
+        fab.style.opacity = '1';
+        fab.style.transform = 'translateX(-50%) scale(1)';
+        fab.style.pointerEvents = 'auto';
+      }
+    }
     
     // ====== END FAB FUNCTIONALITY ======
     
@@ -2110,6 +2126,16 @@
         messagesList.style.display = 'none';
         messages = [];
         
+        // Clear selected tabs and context chips
+        selectedTabs = [];
+        clearAllContextChips();
+        
+        // Clear screenshots
+        capturedScreenshots = [];
+        
+        // Reload tabs to trigger auto-select of current tab
+        loadAvailableTabs();
+        
         // Reload chat list
         await loadChats();
         closeSidebar();
@@ -2362,7 +2388,7 @@
     async function loadAvailableTabs() {
       console.log('🔍 [Overlay] Requesting tabs from content script...');
       window.postMessage({
-        type: 'SPEEDY_REQUEST_TABS'
+        type: 'SPEEDY_GET_TABS'
       }, '*');
     }
     
@@ -2537,7 +2563,7 @@
       console.log('✅ [Overlay] Chip added to DOM');
     }
     
-    // Select a tab (single selection mode)
+    // Select a tab (multiple selection mode)
     function selectTab(tab) {
       console.log('🎯 [Overlay] ===== SELECT TAB =====');
       console.log('🎯 [Overlay] Tab:', { id: tab.id, title: tab.title });
@@ -2550,12 +2576,7 @@
         return;
       }
       
-      // Single selection mode: clear all previous selections
-      console.log('🗑️ [Overlay] Clearing previous selections');
-      clearAllContextChips();
-      selectedTabs = [];
-      
-      // Add new selection
+      // Add new selection (allow multiple tabs)
       console.log('➕ [Overlay] Adding new selection');
       selectedTabs.push(tab);
       addContextChip(tab);
@@ -2763,14 +2784,16 @@
       shadowRoot.appendChild(overlay);
     }
     
+    // Track highlighted tab for keyboard navigation
+    let highlightedTabIndex = -1;
+    
     function renderTabList(tabs) {
       console.log('📋 [Overlay] ===== renderTabList called =====');
       console.log('📋 [Overlay] Total tabs:', tabs.length);
-      console.log('📋 [Overlay] Search query:', tabSearchQuery);
-      console.log('📋 [Overlay] Current selectedTabs:', selectedTabs.map(t => ({ id: t.id, title: t.title })));
       
       availableTabs = tabs;
       tabList.innerHTML = '';
+      highlightedTabIndex = -1;
       
       // Filter tabs based on search query
       const filteredTabs = tabSearchQuery 
@@ -2782,126 +2805,88 @@
           })
         : tabs;
       
-      console.log('📋 [Overlay] Filtered tabs:', filteredTabs.length);
-      
       if (filteredTabs.length === 0) {
         tabList.innerHTML = '<div style="padding: 20px; text-align: center; color: rgba(255, 255, 255, 0.5); font-size: 13px;">No tabs found</div>';
         return;
       }
       
       filteredTabs.forEach((tab, index) => {
-        console.log(`🔍 [Overlay] Processing tab ${index}:`, {
-          id: tab.id,
-          title: tab.title,
-          url: tab.url,
-          hasFavIcon: !!tab.favIconUrl,
-          favIconUrl: tab.favIconUrl
-        });
-        
         const isSelected = selectedTabs.find(t => t.id === tab.id);
-        console.log('📋 [Overlay] Tab', index, ':', tab.title, '- Selected:', !!isSelected);
         
-        // Create button
+        // Create button with tighter spacing
         const button = document.createElement('button');
         button.type = 'button';
+        button.className = 'tab-menu-item';
+        button.dataset.tabIndex = index;
+        button.dataset.tabId = tab.id;
         button.style.cssText = `
           display: flex;
           width: 100%;
           text-align: left;
-          padding: 8px 10px;
+          padding: 6px 8px;
           font-size: 13px;
           align-items: center;
           overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          transition: background 150ms ease, opacity 150ms ease;
-          border-radius: 8px;
+          transition: background 150ms ease;
+          border-radius: 6px;
           border: none;
           background: ${isSelected ? 'rgba(96, 165, 250, 0.15)' : 'transparent'};
           cursor: pointer;
-          opacity: ${isSelected ? '1' : '0.85'};
           font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          margin: 0;
         `;
         
         const title = tab.title || 'Untitled';
-        const displayTitle = title.length > 35 ? title.substring(0, 35) + '...' : title;
-        const url = tab.url || '';
-        const displayUrl = url.length > 50 ? url.substring(0, 50) + '...' : url;
+        const displayTitle = title.length > 40 ? title.substring(0, 40) + '...' : title;
         
-        // Favicon already converted to data URL by background script
+        // Favicon
         const faviconUrl = tab.favIconUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="%23666"/></svg>';
-        console.log(`✅ [Overlay] Tab menu favicon for tab ${tab.id}:`, faviconUrl.substring(0, 50) + '...');
         
         button.innerHTML = `
-          <span style="
-            margin-right: 10px;
-            flex-shrink: 0;
-            width: 18px;
-            height: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          ">
+          <span style="margin-right: 8px; flex-shrink: 0; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;">
             <img alt="${title}" width="16" height="16" src="${faviconUrl}" style="object-fit: contain; border-radius: 2px;" />
           </span>
-          <div style="
-            flex: 1;
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-          ">
-            <div style="
-              color: rgba(255, 255, 255, 0.95);
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-              font-size: 13px;
-              font-weight: 500;
-            ">${displayTitle}</div>
-            <div style="
-              font-size: 11px;
-              color: rgba(255, 255, 255, 0.45);
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-            ">${displayUrl}</div>
-          </div>
-          ${isSelected ? '<span style="margin-left: 8px; flex-shrink: 0; color: rgba(96, 165, 250, 0.8); font-size: 16px;">✓</span>' : ''}
+          <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255, 255, 255, 0.95); font-weight: 500;">
+            ${displayTitle}
+          </span>
+          ${isSelected ? '<span style="margin-left: 8px; flex-shrink: 0; color: rgba(96, 165, 250, 0.8); font-size: 14px;">✓</span>' : ''}
         `;
         
         // Hover effects
         button.addEventListener('mouseenter', () => {
-          if (!isSelected) {
-            button.style.background = 'rgba(255, 255, 255, 0.08)';
-            button.style.opacity = '1';
-          }
+          highlightedTabIndex = index;
+          updateTabHighlight();
         });
         
-        button.addEventListener('mouseleave', () => {
-          if (!isSelected) {
-            button.style.background = 'transparent';
-            button.style.opacity = '0.85';
-          }
-        });
-        
-        // Click handler - single select and auto-close
+        // Click handler - select and auto-close
         button.addEventListener('click', () => {
-          console.log('🖱️ [Overlay] Tab button clicked:', { id: tab.id, title: tab.title });
-          
-          // Select the tab (handles single selection logic)
           selectTab(tab);
-          
-          // Auto-close the menu and clear search
-          tabMenu.style.display = 'none';
-          atButton.style.background = 'transparent';
-          tabSearchQuery = '';
-          
-          console.log('✅ [Overlay] Menu closed');
+          closeTabMenu();
         });
         
         tabList.appendChild(button);
       });
+    }
+    
+    function updateTabHighlight() {
+      const buttons = tabList.querySelectorAll('.tab-menu-item');
+      buttons.forEach((btn, idx) => {
+        const isSelected = selectedTabs.find(t => t.id == btn.dataset.tabId);
+        if (idx === highlightedTabIndex) {
+          btn.style.background = 'rgba(96, 165, 250, 0.25)';
+        } else if (isSelected) {
+          btn.style.background = 'rgba(96, 165, 250, 0.15)';
+        } else {
+          btn.style.background = 'transparent';
+        }
+      });
+    }
+    
+    function closeTabMenu() {
+      tabMenu.style.display = 'none';
+      atButton.style.background = 'transparent';
+      tabSearchQuery = '';
+      highlightedTabIndex = -1;
     }
     
     // Model Selector handler
@@ -2936,10 +2921,53 @@
         loadAvailableTabs();
         tabMenu.style.display = 'block';
         atButton.style.background = 'rgba(255, 255, 255, 0.1)';
+        highlightedTabIndex = 0; // Start with first tab highlighted
+        // Highlight first tab after a short delay to ensure tabs are rendered
+        setTimeout(() => updateTabHighlight(), 50);
       } else {
-        tabMenu.style.display = 'none';
-        atButton.style.background = 'transparent';
-        tabSearchQuery = '';
+        closeTabMenu();
+      }
+    });
+    
+    // Keyboard navigation for tab menu
+    document.addEventListener('keydown', (e) => {
+      // Only handle if tab menu is open
+      if (tabMenu.style.display !== 'block') return;
+      
+      const buttons = tabList.querySelectorAll('.tab-menu-item');
+      if (buttons.length === 0) return;
+      
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        highlightedTabIndex = Math.min(highlightedTabIndex + 1, buttons.length - 1);
+        updateTabHighlight();
+        // Scroll highlighted item into view
+        buttons[highlightedTabIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        highlightedTabIndex = Math.max(highlightedTabIndex - 1, 0);
+        updateTabHighlight();
+        // Scroll highlighted item into view
+        buttons[highlightedTabIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (highlightedTabIndex >= 0 && highlightedTabIndex < availableTabs.length) {
+          const filteredTabs = tabSearchQuery 
+            ? availableTabs.filter(tab => {
+                const searchLower = tabSearchQuery.toLowerCase();
+                return (tab.title || '').toLowerCase().includes(searchLower) || 
+                       (tab.url || '').toLowerCase().includes(searchLower);
+              })
+            : availableTabs;
+          const selectedTab = filteredTabs[highlightedTabIndex];
+          if (selectedTab) {
+            selectTab(selectedTab);
+            closeTabMenu();
+          }
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeTabMenu();
       }
     });
     
@@ -2969,6 +2997,49 @@
     });
     
     input.addEventListener('keydown', (e) => {
+      // Handle arrow keys for tab menu navigation BEFORE stopping propagation
+      if (tabMenu.style.display === 'block') {
+        const buttons = tabList.querySelectorAll('.tab-menu-item');
+        
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (buttons.length > 0) {
+            highlightedTabIndex = Math.min(highlightedTabIndex + 1, buttons.length - 1);
+            updateTabHighlight();
+            buttons[highlightedTabIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+          return;
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (buttons.length > 0) {
+            highlightedTabIndex = Math.max(highlightedTabIndex - 1, 0);
+            updateTabHighlight();
+            buttons[highlightedTabIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+          return;
+        } else if (e.key === 'Enter' && highlightedTabIndex >= 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          const filteredTabs = tabSearchQuery 
+            ? availableTabs.filter(tab => {
+                const searchLower = tabSearchQuery.toLowerCase();
+                return (tab.title || '').toLowerCase().includes(searchLower) || 
+                       (tab.url || '').toLowerCase().includes(searchLower);
+              })
+            : availableTabs;
+          if (highlightedTabIndex < filteredTabs.length) {
+            const selectedTab = filteredTabs[highlightedTabIndex];
+            if (selectedTab) {
+              selectTab(selectedTab);
+              closeTabMenu();
+            }
+          }
+          return;
+        }
+      }
+      
       e.stopPropagation();
       
       if (e.key === 'Escape' && isVisible) {
@@ -2993,6 +3064,8 @@
           loadAvailableTabs();
           tabMenu.style.display = 'block';
           atButton.style.background = 'rgba(255, 255, 255, 0.1)';
+          highlightedTabIndex = 0;
+          setTimeout(() => updateTabHighlight(), 50);
         }, 0);
       }
       
@@ -3262,13 +3335,23 @@
         console.log('✅ [Overlay] Received SPEEDY_TABS_RESPONSE:', event.data);
         const tabs = event.data.tabs || [];
         console.log('📋 [Overlay] Tabs count:', tabs.length);
+        console.log('📋 [Overlay] Currently selected tabs:', selectedTabs.length);
         
         // Automatically add the current tab if no tabs are selected
         const currentTab = tabs.find(tab => tab.active);
-        if (currentTab && selectedTabs.length === 0) {
-          console.log('🔍 [Overlay] Auto-adding current tab to context:', currentTab.title);
-          selectedTabs.push(currentTab);
-          addContextChip(currentTab);
+        if (currentTab) {
+          const alreadySelected = selectedTabs.find(t => t.id === currentTab.id);
+          if (!alreadySelected && selectedTabs.length === 0) {
+            console.log('🔍 [Overlay] Auto-selecting current tab:', currentTab.title);
+            selectedTabs.push(currentTab);
+            addContextChip(currentTab);
+          } else if (alreadySelected) {
+            console.log('ℹ️ [Overlay] Current tab already selected');
+          } else {
+            console.log('ℹ️ [Overlay] Other tabs already selected, not auto-selecting current tab');
+          }
+        } else {
+          console.log('⚠️ [Overlay] No current tab found in tabs list');
         }
         
         renderTabList(tabs);
